@@ -32,7 +32,7 @@ impl Context {
         let manifest_folder = manifest_toml.parent().unwrap().to_path_buf();
 
         let target_folder = manifest_folder.join("site");
-        let project_folder = manifest_folder.join("templates");
+        let project_folder = manifest_folder.join("src");
         log_info!("Target","`{}`",target_folder.to_str().unwrap());
 
         let ctx = Context {

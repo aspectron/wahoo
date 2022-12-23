@@ -68,14 +68,12 @@ pub async fn async_main() -> Result<()> {
     let Args {
         location,
         action,
-        // verbose,
-        ..
+        verbose,
     }= Args::parse();
-    // let Cmd::Args(Args {
-    //     action,
-    //     location,
-    //     verbose,
-    // }) = args;
+
+    if verbose {
+        log::enable_verbose();
+    }
 
     match action {
         Action::Build {
