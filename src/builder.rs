@@ -13,6 +13,7 @@ impl Builder {
         }
     }
 
+    /// Migrate non-template files into the target directory
     pub async fn migrate(&self, include : &Filter, exclude : &Filter) -> Result<()> {
 
         let list = WalkDir::new(&self.ctx.project_folder)
@@ -60,8 +61,9 @@ impl Builder {
         }
 
         Ok(())
-
     }
+
+    /// Render templates into the target directory
     pub async fn render(&self, glob : &str, exclude: &Filter) -> Result<()> {
 
         let tera = match tera::Tera::new(self.ctx.project_folder.join(glob).to_str().unwrap()) {
@@ -81,7 +83,7 @@ impl Builder {
         // context.insert("show_all", &false);
         // context.insert("bio", &"<script>alert('pwnd');</script>");
 
-        log_info!("Render","processing folders");
+        log_trace!("Render","processing folders");
 
         let mut folders = HashSet::new();
         for template in tera.get_template_names() {
@@ -134,12 +136,10 @@ impl Builder {
         Ok(())
     }
 
-
     pub async fn execute(&self) -> Result<()> {
 
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
-        log_info!("Project", "`{}`", self.ctx.project_folder.display());
 
         let glob = "**/*{.html,.js}";
         let include = Filter::new(&[glob]);
@@ -150,9 +150,9 @@ impl Builder {
             Filter::default()
         };
 
-        log_info!("Migrate","migrating files");
+        log_trace!("Migrate","migrating files");
         self.migrate(&include,&exclude).await?;
-        log_info!("Render","loading templates");
+        log_trace!("Render","loading templates");
         self.render(glob, &exclude).await?;
         log_info!("Build","done");
         println!("");

@@ -33,6 +33,7 @@ impl Context {
 
         let target_folder = manifest_folder.join("site");
         let project_folder = manifest_folder.join("src");
+        log_info!("Project","`{}`",project_folder.to_str().unwrap());
         log_info!("Target","`{}`",target_folder.to_str().unwrap());
 
         let ctx = Context {
@@ -59,7 +60,7 @@ impl Context {
 
     pub async fn clean(&self) -> Result<()> {
         if self.target_folder.exists().await {
-            log_info!("Cleaning","`{}`",self.target_folder.display());
+            // log_info!("Cleaning","`{}`",self.target_folder.display());
             async_std::fs::remove_dir_all(&self.target_folder).await?;
         }
         Ok(())
