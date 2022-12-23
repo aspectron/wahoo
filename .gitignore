@@ -1,5 +1,5 @@
 /target
 /Cargo.lock
-/test
 *.code-workspace
 analyzer-target
+/test/site
