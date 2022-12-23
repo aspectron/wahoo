@@ -68,6 +68,8 @@ impl Builder {
 
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
+        let dir = &self.ctx.project_folder;
+        log_info!("Templates", "`{}`", dir.to_str().unwrap());
 
         let glob = "**/*{.html,.js}";
         
@@ -75,8 +77,9 @@ impl Builder {
         self.migrate(glob).await?;
 
         log_info!("Render","loading templates");
+        
 
-        let tera = match tera::Tera::new(self.ctx.project_folder.join(glob).to_str().unwrap()) {
+        let tera = match tera::Tera::new(dir.join(glob).to_str().unwrap()) {
             Ok(t) => t,
             Err(e) => {
                 println!("Parsing error(s): {}", e);
@@ -84,9 +87,11 @@ impl Builder {
             }
         };
 
-        let context = &tera::Context::from_serialize(&self.ctx.manifest.toml)?;
+        let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
+        
         // let mut context = tera::Context::new();
-        // context.insert("username", &"Bob");
+        //context.insert("username", &"Bob");
+        //println!("context: {:?}", context);
         // context.insert("numbers", &vec![1, 2, 3]);
         // context.insert("show_all", &false);
         // context.insert("bio", &"<script>alert('pwnd');</script>");
