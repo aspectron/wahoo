@@ -62,30 +62,9 @@ impl Builder {
         Ok(())
 
     }
+    pub async fn render(&self, glob : &str, exclude: &Filter) -> Result<()> {
 
-    pub async fn execute(&self) -> Result<()> {
-
-        self.ctx.clean().await?;
-        self.ctx.ensure_folders().await?;
-        let dir = &self.ctx.project_folder;
-        log_info!("Templates", "`{}`", dir.to_str().unwrap());
-
-        let glob = "**/*{.html,.js}";
-
-        let include = Filter::new(&[glob]);
-        let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
-            let list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
-            Filter::new(&list)
-        } else {
-            Filter::default()
-        };
-
-        log_info!("Migrate","migrating files");
-        self.migrate(&include,&exclude).await?;
-
-        log_info!("Render","loading templates");
-
-        let tera = match tera::Tera::new(dir.join(glob).to_str().unwrap()) {
+        let tera = match tera::Tera::new(self.ctx.project_folder.join(glob).to_str().unwrap()) {
             Ok(t) => t,
             Err(e) => {
                 println!("Parsing error(s): {}", e);
@@ -152,10 +131,36 @@ impl Builder {
             };
         }
 
+        Ok(())
+    }
+
+
+    pub async fn execute(&self) -> Result<()> {
+
+        self.ctx.clean().await?;
+        self.ctx.ensure_folders().await?;
+        log_info!("Project", "`{}`", self.ctx.project_folder.display());
+
+        let glob = "**/*{.html,.js}";
+        let include = Filter::new(&[glob]);
+        let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
+            let list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
+            Filter::new(&list)
+        } else {
+            Filter::default()
+        };
+
+        log_info!("Migrate","migrating files");
+        self.migrate(&include,&exclude).await?;
+        log_info!("Render","loading templates");
+        self.render(glob, &exclude).await?;
         log_info!("Build","done");
         println!("");
 
         Ok(())
     }
+
+
+
 }
 
