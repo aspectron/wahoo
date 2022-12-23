@@ -1,5 +1,6 @@
-
 [site]
-
 name = "test"
 title = "Test Site"
+
+# remove to test failure
+something = "123"

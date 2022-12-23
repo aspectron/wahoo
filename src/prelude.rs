@@ -16,3 +16,4 @@ pub use serde::{Serialize,Deserialize};
 pub use async_std::path::{Path,PathBuf};
 pub use async_std::fs;
 pub use tera;
+pub use console::style;

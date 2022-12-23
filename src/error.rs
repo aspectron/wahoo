@@ -26,7 +26,7 @@ pub enum Error {
     #[error("Regex error: {0}")]
     Regex(#[from] regex::Error),
     
-    #[error("Tera error: {0}")]
+    #[error("{0}")]
     Tera(#[from] tera::Error),
     
     #[error("StripPrefixError: {0}")]

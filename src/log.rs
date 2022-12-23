@@ -32,6 +32,10 @@ pub mod impls {
         println!("{:>12} {}",style(source).yellow().bold(), args.to_string());
     }
 
+    pub fn log_error_impl(args : &fmt::Arguments<'_>) {
+        println!("{:>12} {}",style("Error").red().bold(), args.to_string());
+    }
+
     pub fn stage_impl(args : &fmt::Arguments<'_>) {
         println!("{:>12} {}",style("Stage").cyan().bold(), args.to_string());
     }
@@ -60,6 +64,13 @@ macro_rules! log_warn {
 }
 
 #[macro_export]
+macro_rules! log_error {
+    ($($t:tt)*) => (
+        crate::impls::log_error_impl(&format_args!($($t)*))
+    )
+}
+
+#[macro_export]
 macro_rules! log_state {
     ($target:expr, $($t:tt)*) => (
         crate::impls::log_state_impl($target, &format_args!($($t)*))
@@ -69,6 +80,7 @@ macro_rules! log_state {
 pub use log_trace;
 pub use log_info;
 pub use log_warn;
+pub use log_error;
 pub use log_state;
 
 pub fn log_state_clear() {

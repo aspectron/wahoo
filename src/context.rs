@@ -15,7 +15,6 @@ impl Default for Options {
 pub struct Context {
 
     pub manifest : Manifest,
-    
     pub target_folder : PathBuf,
     pub project_folder : PathBuf,
 }

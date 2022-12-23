@@ -27,7 +27,7 @@ impl Builder {
             }
         };
 
-        let context = &tera::Context::from_serialize(&self.ctx.manifest)?;
+        let context = &tera::Context::from_serialize(&self.ctx.manifest.toml)?;
         // let mut context = tera::Context::new();
         // context.insert("username", &"Bob");
         // context.insert("numbers", &vec![1, 2, 3]);
@@ -59,12 +59,15 @@ impl Builder {
                     fs::write(target_file,&s).await?;
                 },
                 Err(e) => {
-                    println!("Error: {}", e);
+                    // println!("Error: {}", e);
                     let mut cause = e.source();
                     while let Some(e) = cause {
-                        println!("Reason: {}", e);
+                        println!("");
+                        log_error!("{}",e);
                         cause = e.source();
                     }
+
+                    return Err(e.into());
                 }
             };
         }

@@ -1,13 +1,10 @@
-// use std::collections::HashSet;
 use async_std::fs::*;
 use async_std::path::{PathBuf, Path};
 use crate::prelude::*;
-use regex::Regex;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone)]
 pub struct Manifest {
-    pub site : Site,
+    pub toml : toml::Value,
 }
 
 impl Manifest {
@@ -49,34 +46,17 @@ impl Manifest {
         Err(format!("Unable to locate 'wahoo.toml' manifest").into())
     }
     
-    pub async fn load(toml : &PathBuf) -> Result<Manifest> {
-        let nw_toml = read_to_string(toml).await?;
-        let manifest: Manifest = match toml::from_str(&nw_toml) {
+    pub async fn load(toml_file : &PathBuf) -> Result<Manifest> {
+        let toml_text = read_to_string(toml_file).await?;
+        let toml: toml::Value = match toml::from_str(&toml_text) {
             Ok(manifest) => manifest,
             Err(err) => {
                 return Err(format!("Error loading nw.toml: {}", err).into());
             }
-        };    
 
-        manifest.sanity_checks()?;
+        };
 
-        Ok(manifest)
+        Ok(Manifest { toml })
     }
     
-    pub fn sanity_checks(&self) -> Result<()> {
-
-        let regex = Regex::new(r"^[^\s]*[a-z0-9-_]*$").unwrap();
-        if !regex.is_match(&self.site.name) {
-            return Err(format!("invalid application name '{}'", self.site.name).into());
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Site {
-    pub name : String,
-    pub title : String,
-    pub target_folder : Option<String>,
 }
