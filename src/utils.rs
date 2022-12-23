@@ -1,5 +1,3 @@
-use async_std::path::PathBuf;
-use async_std::path::Path;
 use regex::Regex;
 use crate::prelude::*;
 
@@ -59,8 +57,11 @@ pub fn get_env_defs(strings: &Vec<String>) -> Result<Vec<(String, String)>> {
     Ok(parsed_strings)
 }
 
-pub fn is_hidden(path: &std::path::Path) -> bool {
+pub fn is_hidden<P>(path: P) -> bool 
+where P : AsRef<Path>
+{
     let is_hidden = path
+        .as_ref()
         .components()
         .find(|f|f.as_os_str().to_string_lossy().starts_with("."))
         .is_some();

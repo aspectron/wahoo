@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use crate::prelude::*;
 use walkdir::WalkDir;
-use globset::*;
 
 pub struct Builder {
     ctx : Arc<Context>,
@@ -14,11 +13,7 @@ impl Builder {
         }
     }
 
-    pub async fn migrate(&self, filter : &str) -> Result<()> {
-
-        let filter = Glob::new(filter)
-            .expect(&format!("Error compiling filter glob `{}`",filter))
-            .compile_matcher();
+    pub async fn migrate(&self, include : &Filter, exclude : &Filter) -> Result<()> {
 
         let list = WalkDir::new(&self.ctx.project_folder)
             .into_iter()
@@ -27,11 +22,15 @@ impl Builder {
                 let path = entry.path();
                 let relative = path.strip_prefix(&self.ctx.project_folder).unwrap();
                 
-                if relative.to_string_lossy().len() == 0 || is_hidden(relative) {
+                let relative_str = relative.to_str().unwrap();
+                if relative_str.len() == 0 || is_hidden(relative) {
                     return None;
                 }
 
-                if filter.is_match(relative.to_str().unwrap()) || !path.is_file() {
+                if include.is_match(relative_str) || !path.is_file() {
+                    None
+                } else if exclude.is_match(relative_str) {
+                    log_trace!("Migrate","{} `{}`",style("ignore:").yellow(),path.display());
                     None
                 } else {
                     Some(Path::new(relative).to_path_buf())
@@ -56,7 +55,7 @@ impl Builder {
         for file in list {
             let to_file = self.ctx.target_folder.join(&file);
             // println!("+{}",file.display());
-            log_trace!("Migrate","`{}` to `{}`",file.display(), to_file.display());
+            log_trace!("Migrate","{} `{}` to `{}`",style("migrate:").cyan(), file.display(), to_file.display());
             std::fs::copy(self.ctx.project_folder.join(&file),to_file)?;
         }
 
@@ -72,12 +71,19 @@ impl Builder {
         log_info!("Templates", "`{}`", dir.to_str().unwrap());
 
         let glob = "**/*{.html,.js}";
-        
+
+        let include = Filter::new(&[glob]);
+        let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
+            let list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
+            Filter::new(&list)
+        } else {
+            Filter::default()
+        };
+
         log_info!("Migrate","migrating files");
-        self.migrate(glob).await?;
+        self.migrate(&include,&exclude).await?;
 
         log_info!("Render","loading templates");
-        
 
         let tera = match tera::Tera::new(dir.join(glob).to_str().unwrap()) {
             Ok(t) => t,
@@ -100,24 +106,37 @@ impl Builder {
 
         let mut folders = HashSet::new();
         for template in tera.get_template_names() {
-            let target_file = self.ctx.target_folder.join(template);
-            let folder = Path::new(&target_file);
+            // let target_file = self.ctx.target_folder.join(template);
+            let folder = Path::new(&template);
             if let Some(parent) = folder.parent() {
-                folders.insert(parent.to_path_buf());
+                if parent.to_string_lossy().len()!= 0 {
+                    folders.insert(parent.to_path_buf());
+                }
             }
         }
     
         for folder in folders {
+            log_trace!("Folders","{} `{}`",style("creating:").cyan(),folder.display());
             std::fs::create_dir_all(self.ctx.target_folder.join(folder))?; 
         }
 
         log_info!("Render","rendering");
         for template in tera.get_template_names() {
+
+            if is_hidden(template) {
+                continue;
+            }
+
+            if exclude.is_match(template) {
+                log_trace!("Render","{} `{}`", style("ignore:").yellow(),template);
+                continue;
+            }
+
             use std::error::Error;
             match tera.render(template, &context) {
                 Ok(s) => {
                     let target_file = self.ctx.target_folder.join(template);
-                    log_trace!("Render","`{}`", template);
+                    log_trace!("Render","{} `{}`", style("render:").cyan(), template);
                     fs::write(target_file,&s).await?;
                 },
                 Err(e) => {
@@ -133,7 +152,7 @@ impl Builder {
             };
         }
 
-        log_info!("Render","done");
+        log_info!("Build","done");
         println!("");
 
         Ok(())

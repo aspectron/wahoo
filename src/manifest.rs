@@ -5,6 +5,7 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub struct Manifest {
     pub toml : toml::Value,
+    pub settings : Option<Settings>,
 }
 
 impl Manifest {
@@ -56,7 +57,20 @@ impl Manifest {
 
         };
 
-        Ok(Manifest { toml })
+        let settings = if let Some(settings) = toml.get("settings") {
+            let settings : Settings = settings.clone().try_into()?;
+            Some(settings)
+        } else { 
+            None
+        };
+        
+
+        Ok(Manifest { toml, settings })
     }
     
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Settings {
+    pub ignore : Option<Vec<String>>,
 }

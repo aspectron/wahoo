@@ -10,6 +10,7 @@ pub mod context;
 pub mod builder;
 pub mod log;
 pub mod utils;
+pub mod filter;
 pub mod prelude;
 
 use prelude::*;

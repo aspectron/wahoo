@@ -1,6 +1,6 @@
-[site]
-name = "test"
-title = "Test Site"
+[settings]
+ignore = ["ignore*"]
 
-# remove to test failure
+[site]
+title = "Test Site"
 something = "123"
