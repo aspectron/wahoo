@@ -64,6 +64,8 @@ impl Manifest {
             None
         };
         
+        let table = toml.as_table();
+        println!("{:#?}", table);
 
         Ok(Manifest { toml, settings })
     }

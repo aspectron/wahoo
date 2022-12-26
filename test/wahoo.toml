@@ -4,3 +4,9 @@ ignore = ["ignore*"]
 [site]
 title = "Test Site"
 something = "123"
+
+[project.alpha]
+text = "alpha text"
+
+[project.beta]
+text = "beta text"
