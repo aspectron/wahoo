@@ -49,8 +49,8 @@ impl tera::Filter for SortObject{
 
             result.sort_by(|a, b| {
                 let empty = serde_json::json!(0);
-                let a_sort = a.get("sort").unwrap_or(&empty).as_i64().unwrap();
-                let b_sort = b.get("sort").unwrap_or(&empty).as_i64().unwrap();
+                let a_sort = a.get("sort-index").unwrap_or(&empty).as_i64().unwrap();
+                let b_sort = b.get("sort-index").unwrap_or(&empty).as_i64().unwrap();
                 a_sort.cmp(&b_sort)
             });
         }
