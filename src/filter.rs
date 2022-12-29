@@ -58,3 +58,20 @@ impl tera::Filter for SortObject{
         Ok(serde_json::Value::Array(result))
     }
 }
+
+pub struct Markdown{}
+
+impl tera::Filter for Markdown{
+    fn filter(&self, 
+        value: &serde_json::Value,
+        _args: &std::collections::HashMap<String, serde_json::Value>
+    ) -> tera::Result<serde_json::Value> {
+        if !value.is_string(){
+            return Ok(value.clone())
+        }
+
+        let str = value.as_str().unwrap();
+        let result = markdown_to_html(str);
+        Ok(serde_json::Value::String(result))
+    }
+}

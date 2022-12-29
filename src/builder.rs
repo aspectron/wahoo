@@ -75,8 +75,10 @@ impl Builder {
         };
 
         let sort_object = SortObject{};
+        let markdown = Markdown{};
 
         tera.register_filter("sort_object", sort_object);
+        tera.register_filter("markdown", markdown);
 
         let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
         
@@ -148,7 +150,7 @@ impl Builder {
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
 
-        let glob = "templates/**/*{.html,.js}";
+        let glob = "templates/**/*{.html,.js,.raw}";
         let include = Filter::new(&[glob]);
         let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
             let list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();

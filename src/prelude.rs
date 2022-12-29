@@ -8,6 +8,7 @@ pub use crate:: {
     log::*,
     utils::*,
     filter::*,
+    markdown::*
 };
 
 pub use cfg_if::cfg_if;
