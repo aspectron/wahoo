@@ -66,16 +66,23 @@ impl Builder {
     /// Render templates into the target directory
     pub async fn render(&self, glob : &str, exclude: &Filter) -> Result<()> {
 
-        let tera = match tera::Tera::new(self.ctx.project_folder.join(glob).to_str().unwrap()) {
+        let mut tera = match tera::Tera::new(self.ctx.project_folder.join(glob).to_str().unwrap()) {
             Ok(t) => t,
             Err(e) => {
-                println!("Parsing error(s): {}", e);
+                println!("Parsing error(s): {}, glob:{}", e, glob);
                 ::std::process::exit(1);
             }
         };
 
+        let sort_object = SortObject{};
+
+        tera.register_filter("sort_object", sort_object);
+
         let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
         
+        //println!("context.get(\"project\"): {:#?}", context.get("project"));
+        //let table = self.ctx.manifest.toml.as_table().unwrap();
+        //context.insert("table", table);
         // let mut context = tera::Context::new();
         //context.insert("username", &"Bob");
         //println!("context: {:?}", context);
@@ -141,7 +148,7 @@ impl Builder {
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
 
-        let glob = "**/*{.html,.js}";
+        let glob = "templates/**/*{.html,.js}";
         let include = Filter::new(&[glob]);
         let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
             let list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
