@@ -65,8 +65,9 @@ impl Builder {
 
     /// Render templates into the target directory
     pub async fn render(&self, glob : &str, exclude: &Filter) -> Result<()> {
-
-        let mut tera = match tera::Tera::new(self.ctx.project_folder.join(glob).to_str().unwrap()) {
+        let dir = self.ctx.project_folder.join(glob);
+        let dir = dir.to_str().unwrap();
+        let mut tera = match tera::Tera::new(dir) {
             Ok(t) => t,
             Err(e) => {
                 println!("Parsing error(s): {}, glob:{}", e, glob);
@@ -74,13 +75,24 @@ impl Builder {
             }
         };
 
+        let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
+
         let sort_object = SortObject{};
         let markdown = Markdown{};
 
+        let include_file = IncludeFile::new(
+            dir,
+            context.clone()
+        );
+
         tera.register_filter("sort_object", sort_object);
         tera.register_filter("markdown", markdown);
+        tera.register_filter("include_file", include_file);
 
-        let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
+        
+
+        //context.insert("_tera", &tera);
+        //tera.register_function("include_file", include_file);
         
         //println!("context.get(\"project\"): {:#?}", context.get("project"));
         //let table = self.ctx.manifest.toml.as_table().unwrap();
@@ -117,12 +129,15 @@ impl Builder {
                 continue;
             }
 
+            
+
             if exclude.is_match(template) {
                 log_trace!("Render","{} `{}`", style("ignore:").yellow(),template);
                 continue;
             }
 
             use std::error::Error;
+            log_info!("Rendering", "{}", style(template).blue());
             match tera.render(template, &context) {
                 Ok(s) => {
                     let target_file = self.ctx.target_folder.join(template);
@@ -153,10 +168,13 @@ impl Builder {
         let glob = "templates/**/*{.html,.js,.raw}";
         let include = Filter::new(&[glob]);
         let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
-            let list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
+            let mut list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
+            list.push("partial/**/*");
+
             Filter::new(&list)
         } else {
-            Filter::default()
+            let list = vec!["partial/**/*"];
+            Filter::new(&list)
         };
 
         log_trace!("Migrate","migrating files");
