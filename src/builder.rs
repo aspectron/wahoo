@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use crate::prelude::*;
 use walkdir::WalkDir;
 
@@ -65,6 +65,7 @@ impl Builder {
 
     /// Render templates into the target directory
     pub async fn render(&self, glob : &str, exclude: &Filter) -> Result<()> {
+        let project_folder = self.ctx.project_folder.clone();
         let dir = self.ctx.project_folder.join(glob);
         let dir = dir.to_str().unwrap();
         let mut tera = match tera::Tera::new(dir) {
@@ -78,16 +79,24 @@ impl Builder {
         let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
 
         let sort_object = SortObject{};
-        let markdown = Markdown{};
+        let markdown_filter = Markdown{};
 
         let include_file = IncludeFile::new(
+            project_folder.clone(),
             dir,
             context.clone()
         );
 
+        let project_folder = project_folder.join("templates");
+
         tera.register_filter("sort_object", sort_object);
-        tera.register_filter("markdown", markdown);
+        tera.register_filter("markdown", markdown_filter);
         tera.register_filter("include_file", include_file);
+        tera.register_function("markdown", move |args: &HashMap<String, tera::Value>|->tera::Result<tera::Value>{
+            let value = markdown(&project_folder, args)?;
+            Ok(value)
+        });
+
 
         
 
@@ -128,8 +137,6 @@ impl Builder {
             if is_hidden(template) {
                 continue;
             }
-
-            
 
             if exclude.is_match(template) {
                 log_trace!("Render","{} `{}`", style("ignore:").yellow(),template);
