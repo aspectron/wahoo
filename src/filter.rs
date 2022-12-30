@@ -81,14 +81,20 @@ pub struct Markdown{}
 impl tera::Filter for Markdown{
     fn filter(&self, 
         value: &Value,
-        _args: &HashMap<String, Value>
+        args: &HashMap<String, Value>
     ) -> tera::Result<Value> {
         if !value.is_string(){
             return Ok(value.clone())
         }
+        let mut open_in_new_window = true;
+        if let Some(new_window) = args.get("external_links"){
+            if let Some(new_window) = new_window.as_bool(){
+                open_in_new_window = new_window;
+            }
+        }
 
         let str = value.as_str().unwrap();
-        let result = markdown_to_html(str);
+        let result = markdown_to_html(str, open_in_new_window);
         Ok(Value::String(result))
     }
 }
@@ -116,8 +122,15 @@ pub fn markdown(project_folder: &PathBuf, args: &HashMap<String, Value>)->tera::
         return Err("Use {% markdown(content=\"# title\ntest contents\") %} or {% markdown(file=\"path/to/file\") %}".into())
     }
 
+    let mut open_in_new_window = true;
+    if let Some(new_window) = args.get("external_links"){
+        if let Some(new_window) = new_window.as_bool(){
+            open_in_new_window = new_window;
+        }
+    }
+
     if let Some(str) = content{
-        let result = markdown_to_html(&str);
+        let result = markdown_to_html(&str, open_in_new_window);
         Ok(Value::String(result))
     }else{
         Err("Use {% markdown(content=\"# title\ntest contents\") %} or {% markdown(file=\"path/to/file\") %}".into())
