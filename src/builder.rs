@@ -97,7 +97,7 @@ impl Builder {
         context.insert("locale", &language.locale);
         context.insert("selected_language", &language);
 
-        log_info!("Rendering", "{}", style(template).blue());
+        log_info!("Rendering", "{}", style(format!("{url_prefix}{}",template)).blue());
         match tera.render(template, context) {
             Ok(s) => {
                 Ok(s)
@@ -144,8 +144,13 @@ impl Builder {
         tera.register_filter("sort_object", sort_object);
         tera.register_filter("markdown", markdown_filter);
         tera.register_filter("include_file", include_file);
+        let project_folder_ = project_folder.clone();
         tera.register_function("markdown", move |args: &HashMap<String, tera::Value>|->tera::Result<tera::Value>{
-            let value = markdown(&project_folder, args)?;
+            let value = markdown(&project_folder_, args)?;
+            Ok(value)
+        });
+        tera.register_function("read_md_files", move |args: &HashMap<String, tera::Value>|->tera::Result<tera::Value>{
+            let value = read_md_files(&project_folder, args)?;
             Ok(value)
         });
 
@@ -165,21 +170,66 @@ impl Builder {
             // let target_file = self.ctx.target_folder.join(template);
             let folder = Path::new(&template);
             if let Some(parent) = folder.parent() {
+                if exclude.is_match(parent.to_str().unwrap()) {
+                    continue;
+                }
                 if parent.to_string_lossy().len()!= 0 {
                     folders.insert(parent.to_path_buf());
                 }
             }
         }
-    
-        for folder in folders {
-            log_trace!("Folders","{} `{}`",style("creating:").cyan(),folder.display());
-            std::fs::create_dir_all(self.ctx.target_folder.join(folder))?; 
-        }
 
-        if let Some(languages) = &settings.languages{
-            for language in languages{
-                log_trace!("Folders","{} `{}`",style("creating:").cyan(), language);
-                std::fs::create_dir_all(self.ctx.target_folder.join(language))?;
+        let mut language_list = Vec::new();
+        let info = if let Some(languages) = &settings.languages{
+            if languages.len() == 0{
+                return Err("Please provide any language or disable `settings.languages` from `wahoo.toml`".into());
+            }
+            let mut list = Vec::new();
+            
+            for locale in languages{
+                let url_prefix = format!("/{locale}/");
+                let name = match self.i18n_dict.language(locale){
+                    Ok(name)=>{
+                        if let Some(name) = name{
+                            name.to_string()
+                        }else{
+                            return Err(format!("Unknown language: {locale}").into());
+                        }
+                    }
+                    Err(e)=>{
+                        return Err(format!("Could not find language ({locale}) in workflow_i18n dict, error:{e}").into());
+                    }
+                };
+
+                let lang = Language{name, locale:locale.clone()};
+                language_list.push(lang.clone());
+                list.push((url_prefix, Some(locale.clone()), lang))
+            }
+            list
+        }else{
+            
+            vec![(
+                "/".to_string(),
+                None,
+                Language{
+                    name: "English".to_string(),
+                    locale:"en".to_string()
+                }
+            )]
+        };
+
+        context.insert("languages", &language_list);
+
+        for (_, language, _) in &info{
+            let path = if let Some(language) = language{
+                self.ctx.target_folder.join(language)
+            }else{
+                self.ctx.target_folder.clone()
+            };
+
+            for folder in &folders {
+                log_trace!("Folders","{} `{}`",style("creating:").cyan(), folder.display());
+                std::fs::create_dir_all(path.join(folder))?; 
             }
         }
 
@@ -195,49 +245,7 @@ impl Builder {
                 continue;
             }
 
-
-            let mut language_list = Vec::new();
-            let info = if let Some(languages) = &settings.languages{
-                if languages.len() == 0{
-                    return Err("Please provide any language or disable `settings.languages` from `wahoo.toml`".into());
-                }
-                let mut list = Vec::new();
-                
-                for locale in languages{
-                    let url_prefix = format!("/{locale}/");
-                    let name = match self.i18n_dict.language(locale){
-                        Ok(name)=>{
-                            if let Some(name) = name{
-                                name.to_string()
-                            }else{
-                                return Err(format!("Unknown language: {locale}").into());
-                            }
-                        }
-                        Err(e)=>{
-                            return Err(format!("Could not find language ({locale}) in workflow_i18n dict, error:{e}").into());
-                        }
-                    };
-
-                    let lang = Language{name, locale:locale.clone()};
-                    language_list.push(lang.clone());
-                    list.push((url_prefix, Some(locale.clone()), lang))
-                }
-                list
-            }else{
-                
-                vec![(
-                    "/".to_string(),
-                    None,
-                    Language{
-                        name: "English".to_string(),
-                        locale:"en".to_string()
-                    }
-                )]
-            };
-
-            context.insert("languages", &language_list);
-
-            for (url_prefix, folder, language) in info{
+            for (url_prefix, folder, language) in &info{
                 let content = self.render_template(&tera, template, &mut context, &language, &url_prefix)?;
                 self.save_file(&content, template, folder.as_ref()).await?;
             }
@@ -260,11 +268,11 @@ impl Builder {
 
         let exclude = if let Some(ignore) = &settings.ignore {
             let mut list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
-            list.push("partial/**/*");
+            list.push("partial*");
 
             Filter::new(&list)
         } else {
-            let list = vec!["partial/**/*"];
+            let list = vec!["partial*"];
             Filter::new(&list)
         };
 
