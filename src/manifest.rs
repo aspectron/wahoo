@@ -73,7 +73,9 @@ impl Manifest {
     
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub ignore : Option<Vec<String>>,
+    pub languages: Option<Vec<String>>
 }
+

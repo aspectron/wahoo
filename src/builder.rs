@@ -1,15 +1,24 @@
 use std::collections::{HashMap, HashSet};
 use crate::prelude::*;
 use walkdir::WalkDir;
+use workflow_i18n::Dict;
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+struct Language{
+    locale: String,
+    name: String
+}
 
 pub struct Builder {
     ctx : Arc<Context>,
+    i18n_dict: Dict
 }
 
 impl Builder {
     pub fn new(ctx: Arc<Context>) -> Builder {
         Builder {
-            ctx
+            ctx,
+            i18n_dict : Dict::default()
         }
     }
 
@@ -63,8 +72,51 @@ impl Builder {
         Ok(())
     }
 
+    async fn save_file(&self, content:&str, template:&str, language:Option<&String>)->Result<()>{
+        let target_file = if let Some(language) = language{
+            self.ctx.target_folder.join(language).join(template)
+        }else{
+            self.ctx.target_folder.join(template)
+        };
+        log_trace!("Render","{} `{}`", style("render:").cyan(), template);
+        fs::write(target_file, content).await?;
+        Ok(())
+    }
+
+    fn render_template(
+        &self,
+        tera: &tera::Tera,
+        template:&str,
+        context: &mut tera::Context,
+        language: &Language,
+        url_prefix: &str
+    ) ->Result<String> {
+        use std::error::Error;
+
+        context.insert("url_prefix", url_prefix);
+        context.insert("locale", &language.locale);
+        context.insert("selected_language", &language);
+
+        log_info!("Rendering", "{}", style(template).blue());
+        match tera.render(template, context) {
+            Ok(s) => {
+                Ok(s)
+            },
+            Err(e) => {
+                let mut cause = e.source();
+                while let Some(e) = cause {
+                    println!("");
+                    log_error!("{}",e);
+                    cause = e.source();
+                }
+
+                return Err(e.into());
+            }
+        }
+    }
+
     /// Render templates into the target directory
-    pub async fn render(&self, glob : &str, exclude: &Filter) -> Result<()> {
+    pub async fn render(&self, glob : &str, exclude: &Filter, settings: &Settings) -> Result<()> {
         let project_folder = self.ctx.project_folder.clone();
         let dir = self.ctx.project_folder.join(glob);
         let dir = dir.to_str().unwrap();
@@ -76,7 +128,7 @@ impl Builder {
             }
         };
 
-        let context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
+        let mut context = tera::Context::from_serialize(&self.ctx.manifest.toml)?;
 
         let sort_object = SortObject{};
         let markdown_filter = Markdown{};
@@ -97,13 +149,6 @@ impl Builder {
             Ok(value)
         });
 
-
-        
-
-        //context.insert("_tera", &tera);
-        //tera.register_function("include_file", include_file);
-        
-        //println!("context.get(\"project\"): {:#?}", context.get("project"));
         //let table = self.ctx.manifest.toml.as_table().unwrap();
         //context.insert("table", table);
         // let mut context = tera::Context::new();
@@ -131,6 +176,13 @@ impl Builder {
             std::fs::create_dir_all(self.ctx.target_folder.join(folder))?; 
         }
 
+        if let Some(languages) = &settings.languages{
+            for language in languages{
+                log_trace!("Folders","{} `{}`",style("creating:").cyan(), language);
+                std::fs::create_dir_all(self.ctx.target_folder.join(language))?;
+            }
+        }
+
         log_info!("Render","rendering");
         for template in tera.get_template_names() {
 
@@ -143,25 +195,53 @@ impl Builder {
                 continue;
             }
 
-            use std::error::Error;
-            log_info!("Rendering", "{}", style(template).blue());
-            match tera.render(template, &context) {
-                Ok(s) => {
-                    let target_file = self.ctx.target_folder.join(template);
-                    log_trace!("Render","{} `{}`", style("render:").cyan(), template);
-                    fs::write(target_file,&s).await?;
-                },
-                Err(e) => {
-                    let mut cause = e.source();
-                    while let Some(e) = cause {
-                        println!("");
-                        log_error!("{}",e);
-                        cause = e.source();
-                    }
 
-                    return Err(e.into());
+            let mut language_list = Vec::new();
+            let info = if let Some(languages) = &settings.languages{
+                if languages.len() == 0{
+                    return Err("Please provide any language or disable `settings.languages` from `wahoo.toml`".into());
                 }
+                let mut list = Vec::new();
+                
+                for locale in languages{
+                    let url_prefix = format!("/{locale}/");
+                    let name = match self.i18n_dict.language(locale){
+                        Ok(name)=>{
+                            if let Some(name) = name{
+                                name.to_string()
+                            }else{
+                                return Err(format!("Unknown language: {locale}").into());
+                            }
+                        }
+                        Err(e)=>{
+                            return Err(format!("Could not find language ({locale}) in workflow_i18n dict, error:{e}").into());
+                        }
+                    };
+
+                    let lang = Language{name, locale:locale.clone()};
+                    language_list.push(lang.clone());
+                    list.push((url_prefix, Some(locale.clone()), lang))
+                }
+                list
+            }else{
+                
+                vec![(
+                    "/".to_string(),
+                    None,
+                    Language{
+                        name: "English".to_string(),
+                        locale:"en".to_string()
+                    }
+                )]
             };
+
+            context.insert("languages", &language_list);
+
+            for (url_prefix, folder, language) in info{
+                let content = self.render_template(&tera, template, &mut context, &language, &url_prefix)?;
+                self.save_file(&content, template, folder.as_ref()).await?;
+            }
+            
         }
 
         Ok(())
@@ -174,7 +254,11 @@ impl Builder {
 
         let glob = "templates/**/*{.html,.js,.raw}";
         let include = Filter::new(&[glob]);
-        let exclude = if let Some(Settings { ignore : Some(ignore) }) = &self.ctx.manifest.settings {
+
+        let default_settings = Settings::default();
+        let settings = self.ctx.manifest.settings.as_ref().unwrap_or(&default_settings);
+
+        let exclude = if let Some(ignore) = &settings.ignore {
             let mut list = ignore.iter().map(|s|s.as_str()).collect::<Vec<_>>();
             list.push("partial/**/*");
 
@@ -187,7 +271,7 @@ impl Builder {
         log_trace!("Migrate","migrating files");
         self.migrate(&include,&exclude).await?;
         log_trace!("Render","loading templates");
-        self.render(glob, &exclude).await?;
+        self.render(glob, &exclude, settings).await?;
         log_info!("Build","done");
         println!("");
 
