@@ -1,40 +1,36 @@
 use crate::prelude::*;
 
 #[derive(Debug)]
-pub struct Options {
-}
+pub struct Options {}
 
 impl Default for Options {
     fn default() -> Self {
-        Options {
-        }
+        Options {}
     }
 }
 
 #[derive(Debug)]
 pub struct Context {
-
-    pub manifest : Manifest,
-    pub target_folder : PathBuf,
-    pub project_folder : PathBuf,
+    pub manifest: Manifest,
+    pub target_folder: PathBuf,
+    pub project_folder: PathBuf,
 }
 
 impl Context {
     pub async fn create(
-        location : Option<String>,
+        location: Option<String>,
         // output : Option<String>,
         _options: Options,
     ) -> Result<Context> {
-
         let manifest_toml = Manifest::locate(location).await?;
-        log_info!("Manifest","`{}`",manifest_toml.to_str().unwrap());
+        log_info!("Manifest", "`{}`", manifest_toml.to_str().unwrap());
         let manifest = Manifest::load(&manifest_toml).await?;
         let manifest_folder = manifest_toml.parent().unwrap().to_path_buf();
 
         let target_folder = manifest_folder.join("site");
         let project_folder = manifest_folder.join("src");
-        log_info!("Project","`{}`",project_folder.to_str().unwrap());
-        log_info!("Target","`{}`",target_folder.to_str().unwrap());
+        log_info!("Project", "`{}`", project_folder.to_str().unwrap());
+        log_info!("Target", "`{}`", target_folder.to_str().unwrap());
 
         let ctx = Context {
             manifest,
@@ -46,9 +42,7 @@ impl Context {
     }
 
     pub async fn ensure_folders(&self) -> Result<()> {
-        let folders = [
-            &self.target_folder,
-        ];
+        let folders = [&self.target_folder];
         for folder in folders {
             if !std::path::Path::new(folder).exists() {
                 std::fs::create_dir_all(folder)?;
@@ -65,6 +59,4 @@ impl Context {
         }
         Ok(())
     }
-
 }
-

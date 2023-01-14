@@ -1,4 +1,4 @@
-
+#[rustfmt::skip]
 pub use crate:: {
     error::*,
     result::*,
@@ -11,12 +11,12 @@ pub use crate:: {
     markdown::*
 };
 
-pub use cfg_if::cfg_if;
-pub use std::sync::Arc;
-pub use duct::cmd;
-pub use serde::{Serialize,Deserialize};
-pub use async_std::path::{Path,PathBuf,Component};
 pub use async_std::fs;
-pub use tera;
+pub use async_std::path::{Component, Path, PathBuf};
+pub use cfg_if::cfg_if;
 pub use console::style;
-pub use globset::{Glob,GlobMatcher};
+pub use duct::cmd;
+pub use globset::{Glob, GlobMatcher};
+pub use serde::{Deserialize, Serialize};
+pub use std::sync::Arc;
+pub use tera;
