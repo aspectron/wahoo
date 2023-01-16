@@ -20,7 +20,7 @@ pub fn parse_toml_from_markdown(str: &str) -> Option<String> {
                 comment_started = true;
                 Event::Html(CowStr::Borrowed(""))
             } else if comment_started {
-                buffer.push_str(&code.to_string());
+                buffer.push_str(&code);
                 Event::Html(CowStr::Borrowed(""))
             } else if code.starts_with("<!---toml") {
                 comment_started = true;
@@ -55,9 +55,9 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
             let t = match tag {
                 Tag::Link(link_type, dest, title) => {
                     //log_trace!("link-type: {:?}, href:{:?}, title:{:?}", link_type, dest, title);
-                    let mut dest_str = dest.into_string();
+                    let dest_str = dest.into_string();
                     let mut href_str = String::new();
-                    let _ = escape_href(&mut href_str, &mut dest_str);
+                    let _ = escape_href(&mut href_str, &dest_str);
                     href_str = href_str.trim().to_string();
 
                     let mut new_window = false;
@@ -86,8 +86,8 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
                         }
                     } else {
                         let mut title_ = String::new();
-                        let mut title_str = title.into_string();
-                        let _ = escape_html(&mut title_, &mut title_str);
+                        let title_str = title.into_string();
+                        let _ = escape_html(&mut title_, &title_str);
                         let title = CowStr::from(title_);
                         if new_window {
                             return Event::Html(CowStr::from(format!(

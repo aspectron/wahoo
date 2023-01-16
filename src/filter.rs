@@ -4,16 +4,9 @@ use std::collections::HashMap;
 use tera::Context;
 use walkdir::WalkDir;
 
+#[derive(Default)]
 pub struct Filter {
     matchers: Vec<GlobMatcher>,
-}
-
-impl Default for Filter {
-    fn default() -> Self {
-        Filter {
-            matchers: Vec::new(),
-        }
-    }
 }
 
 impl Filter {
@@ -22,7 +15,7 @@ impl Filter {
             .iter()
             .map(|glob| {
                 Glob::new(glob)
-                    .expect(&format!("Error compiling glob: {}", glob))
+                    .unwrap_or_else(|_| panic!("Error compiling glob: {}", glob))
                     .compile_matcher()
             })
             .collect::<Vec<_>>();
@@ -31,10 +24,7 @@ impl Filter {
     }
 
     pub fn is_match(&self, text: &str) -> bool {
-        self.matchers
-            .iter()
-            .find(|filter| filter.is_match(text))
-            .is_some()
+        self.matchers.iter().any(|filter| filter.is_match(text))
     }
 }
 
@@ -153,7 +143,7 @@ pub fn read_md_files(
             .flatten()
             .filter_map(|entry| {
                 let path = entry.path();
-                let relative = path.strip_prefix(&project_folder).unwrap();
+                let relative = path.strip_prefix(project_folder).unwrap();
 
                 let relative_str = relative.to_str().unwrap();
                 if !relative_str.ends_with(".md") || is_hidden(relative) {

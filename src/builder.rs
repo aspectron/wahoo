@@ -32,7 +32,7 @@ impl Builder {
                 let relative = path.strip_prefix(&self.ctx.project_folder).unwrap();
 
                 let relative_str = relative.to_str().unwrap();
-                if relative_str.len() == 0 || is_hidden(relative) {
+                if relative_str.is_empty() || is_hidden(relative) {
                     return None;
                 }
 
@@ -122,12 +122,12 @@ impl Builder {
             Err(e) => {
                 let mut cause = e.source();
                 while let Some(e) = cause {
-                    println!("");
+                    println!();
                     log_error!("{}", e);
                     cause = e.source();
                 }
 
-                return Err(e.into());
+                Err(e.into())
             }
         }
     }
@@ -200,7 +200,7 @@ impl Builder {
 
         let mut language_list = Vec::new();
         let info = if let Some(languages) = &settings.languages {
-            if languages.len() == 0 {
+            if languages.is_empty() {
                 return Err(
                     "Please provide any language or disable `settings.languages` from `wahoo.toml`"
                         .into(),
@@ -278,7 +278,7 @@ impl Builder {
 
             for (url_prefix, folder, language) in &info {
                 let content =
-                    self.render_template(&tera, template, &mut context, &language, &url_prefix)?;
+                    self.render_template(&tera, template, &mut context, language, url_prefix)?;
                 self.save_file(&content, template, folder.as_ref()).await?;
             }
         }
@@ -316,7 +316,7 @@ impl Builder {
         log_trace!("Render", "loading templates");
         self.render(glob, &exclude, settings).await?;
         log_info!("Build", "done");
-        println!("");
+        println!();
 
         Ok(())
     }

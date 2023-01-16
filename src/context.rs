@@ -1,13 +1,7 @@
 use crate::prelude::*;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Options {}
-
-impl Default for Options {
-    fn default() -> Self {
-        Options {}
-    }
-}
 
 #[derive(Debug)]
 pub struct Context {

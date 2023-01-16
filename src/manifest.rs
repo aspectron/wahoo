@@ -13,10 +13,10 @@ impl Manifest {
         let cwd = current_dir().await;
 
         let location = if let Some(location) = location {
-            if location.starts_with("~/") {
+            if let Some(stripped) = location.strip_prefix("~/") {
                 home::home_dir()
                     .expect("unable to get home directory")
-                    .join(&location[2..])
+                    .join(stripped)
                     .into()
             } else {
                 let location = Path::new(&location).to_path_buf();
@@ -37,17 +37,14 @@ impl Manifest {
         ];
 
         for location in locations.iter() {
-            match location.canonicalize().await {
-                Ok(location) => {
-                    if location.is_file().await {
-                        return Ok(location);
-                    }
+            if let Ok(location) = location.canonicalize().await {
+                if location.is_file().await {
+                    return Ok(location);
                 }
-                _ => {}
             }
         }
 
-        Err(format!("Unable to locate 'wahoo.toml' manifest").into())
+        Err("Unable to locate 'wahoo.toml' manifest".into())
     }
 
     pub async fn load(toml_file: &PathBuf) -> Result<Manifest> {

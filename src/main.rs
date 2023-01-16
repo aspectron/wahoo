@@ -110,13 +110,13 @@ async fn main() -> Result<()> {
     let result = async_main().await;
     match &result {
         Err(Error::Warning(warn)) => {
-            println!("\nWarning: {}\n", style(format!("{}", warn)).yellow())
+            println!("\nWarning: {}\n", style(warn).yellow())
         }
         // Err(err) => println!("\n{}\n",style(format!("{}", err)).red()),
         // Err(err) => println!("\n{}\n",err),
         Err(err) => {
             log_error!("{}", err);
-            println!("");
+            println!();
         }
         Ok(_) => {}
     };
