@@ -68,6 +68,7 @@ impl Server {
         let mut app = tide::new();
         app.with(tide::log::LogMiddleware::new());
         app.at("/").serve_dir("site/")?;
+        app.at("/").serve_file("site/index.html")?;
 
         let this = self.clone();
         let websockets = this.websockets.clone();
