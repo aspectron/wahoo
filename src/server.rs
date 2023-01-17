@@ -71,13 +71,17 @@ impl Server {
 
         let this = self.clone();
         let websockets = this.websockets.clone();
+        let x = Arc::new(123);
+        // let v = x.clone();
+        let (sender,receiver) = unbounded::<tide_websockets::WebSocketConnection>();
         app.at("/wahoo")
             .get(WebSocket::new(|_request, mut stream| async move {
     
             // let s = stream.clone();
             let id = Id::new();
 
-            let w = websockets.clone(); 
+            let y = x.clone();
+            // let w = websockets.clone(); 
             // websockets.clone().lock().unwrap().insert(id, stream.clone());
     
             while let Some(Ok(Message::Text(input))) = stream.next().await {
