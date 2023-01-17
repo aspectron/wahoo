@@ -26,3 +26,5 @@ notify = "5.0.0"
 futures = "*"
 notify-debouncer-mini = "*"
 tide = "*"
+tide-websockets = "0.4.0"
+workflow-core = { path = "../workflow-core" }

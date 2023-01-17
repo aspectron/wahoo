@@ -1,13 +1,20 @@
 use crate::prelude::*;
+use async_std::prelude::*;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
-use std::time::Duration;
+use std::{time::Duration, collections::HashMap};
+use tide_websockets::{Message, WebSocket};
+use async_std::channel::*;
+use workflow_core::id::Id;
+use std::sync::Mutex;
 
 pub struct Server {
     // pub tide : tide::Server<()>,
     port: u16,
     location: Option<String>,
     paths: Vec<PathBuf>,
+    // update : Receiver<()>,
+    websockets : Arc<Mutex<HashMap<Id,tide_websockets::WebSocketConnection>>>
 }
 
 impl Server {
@@ -17,6 +24,7 @@ impl Server {
             port,
             location,
             paths: paths.to_vec(),
+            websockets: Arc::new(Mutex::new(HashMap::new()))
         };
 
         Arc::new(server)
@@ -36,9 +44,9 @@ impl Server {
 
         log_info!("Server", "monitoring changes...",);
 
-        let port = self.port;
+        let this = self.clone();
         tokio::spawn(async move {
-            match http_server(port).await {
+            match this.http_server().await {
                 Ok(_) => {}
                 Err(e) => {
                     log_error!("Server Error: {:?}", e);
@@ -55,15 +63,40 @@ impl Server {
         }
         Ok(())
     }
+    
+    async fn http_server(self: Arc<Self>) -> Result<()> {
+        let mut app = tide::new();
+        app.with(tide::log::LogMiddleware::new());
+        app.at("/").serve_dir("site/")?;
+
+        let this = self.clone();
+        let websockets = this.websockets.clone();
+        app.at("/wahoo")
+            .get(WebSocket::new(|_request, mut stream| async move {
+    
+            // let s = stream.clone();
+            let id = Id::new();
+
+            let w = websockets.clone(); 
+            // websockets.clone().lock().unwrap().insert(id, stream.clone());
+    
+            while let Some(Ok(Message::Text(input))) = stream.next().await {
+                let output: String = input.chars().rev().collect();
+    
+                stream
+                    .send_string(format!("{} | {}", &input, &output))
+                    .await?;
+            }
+    
+            Ok(())
+        }));
+    
+    
+        let address = format!("127.0.0.1:{}", self.port);
+        log_info!("HTTP", "server listening on {address}");
+        app.listen(address).await?;
+    
+        Ok(())
+    }
 }
 
-async fn http_server(port: u16) -> Result<()> {
-    let mut app = tide::new();
-    app.with(tide::log::LogMiddleware::new());
-    app.at("/").serve_dir("site/")?;
-    let address = format!("127.0.0.1:{}", port);
-    log_info!("HTTP", "server listening on {address}");
-    app.listen(address).await?;
-
-    Ok(())
-}
