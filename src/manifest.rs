@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use async_std::fs::*;
-use async_std::path::{Path, PathBuf};
+// use async_std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Manifest {
@@ -17,7 +17,6 @@ impl Manifest {
                 home::home_dir()
                     .expect("unable to get home directory")
                     .join(stripped)
-                    .into()
             } else {
                 let location = Path::new(&location).to_path_buf();
                 if location.is_absolute() {
@@ -37,8 +36,8 @@ impl Manifest {
         ];
 
         for location in locations.iter() {
-            if let Ok(location) = location.canonicalize().await {
-                if location.is_file().await {
+            if let Ok(location) = location.canonicalize() {
+                if location.is_file() {
                     return Ok(location);
                 }
             }

@@ -316,7 +316,6 @@ impl Builder {
         log_trace!("Render", "loading templates");
         self.render(glob, &exclude, settings).await?;
         log_info!("Build", "done");
-        println!();
 
         Ok(())
     }

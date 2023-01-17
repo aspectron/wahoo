@@ -1,5 +1,3 @@
-// use std::{sync::Arc, env};
-// use async_std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use console::style;
 
@@ -12,9 +10,11 @@ pub mod manifest;
 pub mod markdown;
 pub mod prelude;
 pub mod result;
+pub mod server;
 pub mod utils;
 
 use prelude::*;
+use server::Server;
 
 // #[derive(Debug, Parser)]
 // #[clap(name = "cargo")]
@@ -52,10 +52,19 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum Action {
+    /// Render the site
     Build {},
+    /// Serve the site via HTTP; Monitor and re-render if changed
+    Serve {
+        /// HTTP port to listen on
+        #[clap(long, default_value = "8080")]
+        port: u16,
+    },
+    /// Delete the rendered site files
     Clean {},
-    /// Create NW package template
+    /// Create a basic site template (TODO)
     Init {},
+    /// Publish the site (TODO)
     Publish {},
 }
 
@@ -73,14 +82,26 @@ pub async fn async_main() -> Result<()> {
     match action {
         Action::Build {} => {
             let ctx = Arc::new(Context::create(location, Options::default()).await?);
-
             let build = Arc::new(Builder::new(ctx));
             build.execute().await?;
+            println!();
         }
         Action::Clean {} => {
             let ctx = Arc::new(Context::create(location, Options::default()).await?);
 
             ctx.clean().await?;
+        }
+        Action::Serve { port } => {
+            let (manifest_toml, project_folder) = {
+                let ctx = Arc::new(Context::create(location.clone(), Options::default()).await?);
+                let build = Arc::new(Builder::new(ctx.clone()));
+                build.execute().await?;
+                (ctx.manifest_toml.clone(), ctx.project_folder.clone())
+            };
+
+            let server = Server::new(port, location, &[manifest_toml, project_folder]);
+
+            server.run().await?;
         }
         Action::Init {} => {
             // // let arch = Architecture::default();
@@ -103,6 +124,37 @@ pub async fn async_main() -> Result<()> {
 
     Ok(())
 }
+
+// fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
+//     let (mut tx, rx) = channel();
+
+//     // Automatically select the best implementation for your platform.
+//     // You can also access each implementation directly e.g. INotifyWatcher.
+//     let watcher = RecommendedWatcher::new(move |res| {
+//         futures::executor::block_on(async {
+//             tx.send(res).await.unwrap();
+//         })
+//     }, Config::default())?;
+
+//     Ok((watcher, rx))
+// }
+
+// async fn async_watch<P: AsRef<Path>>(path: P) -> notify::Result<()> {
+//     let (mut watcher, mut rx) = async_watcher()?;
+
+//     // Add a path to be watched. All files and directories at that path and
+//     // below will be monitored for changes.
+//     watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
+
+//     while let Some(res) = rx.next().await {
+//         match res {
+//             Ok(event) => println!("changed: {:?}", event),
+//             Err(e) => println!("watch error: {:?}", e),
+//         }
+//     }
+
+//     Ok(())
+// }
 
 // #[async_std::main]
 #[tokio::main]

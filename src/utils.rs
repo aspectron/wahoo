@@ -1,12 +1,12 @@
 use crate::prelude::*;
 use regex::Regex;
 
-pub async fn search_upwards(folder: &PathBuf, filename: &str) -> Option<PathBuf> {
-    let mut folder = folder.clone();
+pub async fn search_upwards(folder: &Path, filename: &str) -> Option<PathBuf> {
+    let mut folder = folder.to_path_buf();
 
     loop {
         let file_path = folder.join(filename);
-        if file_path.is_file().await {
+        if file_path.is_file() {
             return Some(file_path);
         }
 
@@ -19,15 +19,15 @@ pub async fn search_upwards(folder: &PathBuf, filename: &str) -> Option<PathBuf>
 }
 
 pub async fn current_dir() -> PathBuf {
-    std::env::current_dir().unwrap().into()
+    std::env::current_dir().unwrap()
 }
 
 // pub async fn find_file(folder: &Path,files: &[&str]) -> Result<PathBuf> {
 pub async fn find_file(folder: &Path, files: &[String]) -> Result<PathBuf> {
     for file in files {
         let path = folder.join(file);
-        if let Ok(path) = path.canonicalize().await {
-            if path.is_file().await {
+        if let Ok(path) = path.canonicalize() {
+            if path.is_file() {
                 return Ok(path);
             }
         }

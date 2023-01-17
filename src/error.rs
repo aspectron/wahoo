@@ -33,6 +33,9 @@ pub enum Error {
 
     #[error("Toml Deserialize: {0}")]
     TomlDeserialize(#[from] toml::de::Error),
+
+    #[error(transparent)]
+    Notify(#[from] notify::Error),
 }
 
 impl From<&str> for Error {

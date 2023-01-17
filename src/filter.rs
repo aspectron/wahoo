@@ -87,7 +87,7 @@ impl tera::Filter for Markdown {
     }
 }
 
-pub fn markdown(project_folder: &PathBuf, args: &HashMap<String, Value>) -> tera::Result<Value> {
+pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
     let mut content = None;
     if let Some(c) = args.get("content") {
         if let Some(c) = c.as_str() {

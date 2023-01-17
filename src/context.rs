@@ -6,6 +6,7 @@ pub struct Options {}
 #[derive(Debug)]
 pub struct Context {
     pub manifest: Manifest,
+    pub manifest_toml: PathBuf,
     pub target_folder: PathBuf,
     pub project_folder: PathBuf,
 }
@@ -28,6 +29,7 @@ impl Context {
 
         let ctx = Context {
             manifest,
+            manifest_toml,
             target_folder,
             project_folder,
         };
@@ -47,9 +49,19 @@ impl Context {
     }
 
     pub async fn clean(&self) -> Result<()> {
-        if self.target_folder.exists().await {
+        if self.target_folder.exists() {
             // log_info!("Cleaning","`{}`",self.target_folder.display());
-            async_std::fs::remove_dir_all(&self.target_folder).await?;
+
+            for entry in std::fs::read_dir(&self.target_folder)? {
+                let path = entry?.path();
+                if path.is_dir() {
+                    async_std::fs::remove_dir_all(&path).await?;
+                } else {
+                    std::fs::remove_file(path)?;
+                }
+            }
+
+            // async_std::fs::remove_dir_all(&self.target_folder).await?;
         }
         Ok(())
     }
