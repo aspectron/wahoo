@@ -138,7 +138,7 @@ pub fn read_md_files(
         return Err("Use {% parse_md_files(dir=\"path/to/directory\") %}".into());
     }
     if let Some(dir_path) = dir_path {
-        let list = WalkDir::new(&project_folder.join(dir_path))
+        let list = WalkDir::new(project_folder.join(dir_path))
             .into_iter()
             .flatten()
             .filter_map(|entry| {

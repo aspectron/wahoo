@@ -41,7 +41,7 @@ impl Server {
 
         // No specific tickrate, max debounce time 2 seconds
         let mut debouncer = new_debouncer(Duration::from_millis(1000), None, tx).unwrap();
-    
+
         let watcher = debouncer.watcher();
         for path in self.paths.iter() {
             println!("Watching {}", path.to_str().unwrap());
@@ -60,37 +60,30 @@ impl Server {
             }
         });
 
-        let websockets = self.websockets.clone();
         for (_index, events) in rx.iter().enumerate() {
             log_info!("", "");
-            if events.is_err(){
+            if events.is_err() {
                 continue;
             }
             //log_info!("Event", "events: {}, {:?}", index, events);
             let ctx = Arc::new(Context::create(self.location.clone(), Options::default()).await?);
             let build = Arc::new(Builder::new(ctx));
             build.execute().await?;
-            match websockets.clone().lock(){
-                Ok(websockets)=>{
-                    let files: Vec<String> = events.unwrap().iter().map(|a|{
-                        let str = a.path.as_os_str().to_str().unwrap().to_string();
-                        let mut parts = str.split("templates/");
-                        parts.next();
-                        parts.next().unwrap().to_string()
-                    }).collect();
 
-                    let noti = UpdateNotification{files};
+            let files: Vec<String> = events
+                .unwrap()
+                .iter()
+                .map(|a| {
+                    let str = a.path.as_os_str().to_str().unwrap().to_string();
+                    let mut parts = str.split("templates/");
+                    parts.next();
+                    parts.next().unwrap().to_string()
+                })
+                .collect();
 
-                    for (_id, stream) in websockets.iter(){
-                        let _ = stream
-                            .send_json(&noti)
-                            .await;
-                    }
-                }
-                _=>{
-
-                }
-            }
+            let noti = UpdateNotification { files };
+            let str = serde_json::to_string(&noti)?;
+            self.post(&str).await?;
             log_info!("HTTP", "server listening on port {}", self.port);
             log_info!("Server", "monitoring changes...",);
         }
