@@ -1,103 +1,17 @@
 use crate::prelude::*;
 use async_std::prelude::*;
 use notify::RecursiveMode;
-use notify_debouncer_mini::{
-    new_debouncer_opt,
-    DebounceEventHandler,
-    //new_debouncer,
-    notify::{
-        Watcher,
-        RecommendedWatcher,
-        EventHandler,
-        Config,
-        Result as NResult
-    },
-    DebounceEventResult
-};
+use notify_debouncer_mini::new_debouncer;
 use std::{time::Duration, collections::HashMap};
 use tide_websockets::{Message, WebSocket};
 use async_std::channel::*;
 use workflow_core::id::Id;
 use std::sync::Mutex;
 
-pub struct CustomWatcher{
-    inner: RecommendedWatcher,
-}
-
-struct EventWatcher{
-    server: Arc<Server>,
-    inner: std::sync::mpsc::Sender<DebounceEventResult>
-}
-
-impl EventWatcher{
-    fn new(server: Arc<Server>, inner: std::sync::mpsc::Sender<DebounceEventResult>)->Self{
-        Self {
-            server,
-            inner
-        }
-    }
-}
-
-
-impl DebounceEventHandler for EventWatcher{
-    fn handle_event(&mut self, event: DebounceEventResult) {
-        if !self.server.is_building(){
-            self.inner.handle_event(event)
-        }
-    }
-}
-
-
-
-impl Watcher for CustomWatcher {
-    /// Create a new watcher.
-    fn new<F: EventHandler>(mut event_handler: F, config: Config) -> NResult<Self> {
-        let config = config.with_compare_contents(true);
-        let inner = RecommendedWatcher::new(move |res: NResult<notify::Event>|{
-            
-            if let Ok(a) = &res{
-                let kind = &a.kind;
-                match kind{
-                    notify::EventKind::Modify(c)=>{
-                        match c{
-                            notify::event::ModifyKind::Data(a)=>{
-                                println!("event_handler Modify: {:?}, {:#?}", a, res);
-                                event_handler.handle_event(res);
-                            }
-                            _=>{
-
-                            }
-                        }
-                    }
-                    _=>{
-
-                    }
-                }
-                
-            }
-            
-        }, config)?;
-
-        Ok(Self{
-            inner
-        })
-    }
-
-    fn watch(&mut self, path: &Path, recursive_mode: RecursiveMode) -> NResult<()> {
-        self.inner.watch(path, recursive_mode)
-    }
-
-    fn unwatch(&mut self, path: &Path) -> NResult<()> {
-        self.inner.unwatch(path)
-    }
-
-    fn configure(&mut self, config: Config) -> NResult<bool> {
-        self.inner.configure(config)
-    }
-
-    fn kind() -> notify::WatcherKind {
-        notify::WatcherKind::Fsevent
-    }
+use serde::Serialize;
+#[derive(Debug, Serialize)]
+struct UpdateNotification {
+    files: Vec<String>,
 }
 
 pub struct Server {
@@ -106,8 +20,7 @@ pub struct Server {
     location: Option<String>,
     paths: Vec<PathBuf>,
     // update : Receiver<()>,
-    websockets : Arc<Mutex<HashMap<Id,tide_websockets::WebSocketConnection>>>,
-    building: Arc<Mutex<bool>>
+    websockets : Arc<Mutex<HashMap<Id,tide_websockets::WebSocketConnection>>>
 }
 
 impl Server {
@@ -117,17 +30,10 @@ impl Server {
             port,
             location,
             paths: paths.to_vec(),
-            websockets: Arc::new(Mutex::new(HashMap::new())),
-            building: Arc::new(Mutex::new(false))
+            websockets: Arc::new(Mutex::new(HashMap::new()))
         };
 
         Arc::new(server)
-    }
-    fn building(&self, building: bool){
-        *self.building.lock().unwrap() = building;
-    }
-    pub fn is_building(&self)->bool{
-        *self.building.lock().unwrap()
     }
 
     pub async fn run(self: Arc<Self>) -> Result<()> {
@@ -135,25 +41,12 @@ impl Server {
         let (tx, rx) = std::sync::mpsc::channel();
 
         // No specific tickrate, max debounce time 2 seconds
-        //let mut debouncer = new_debouncer(Duration::from_millis(1000), Some(Duration::from_millis(100)), tx).unwrap();
-        let mut debouncer = new_debouncer_opt::<EventWatcher, CustomWatcher>(
-            Duration::from_millis(1000), 
-            Some(Duration::from_millis(999)),
-            EventWatcher::new(self.clone(), tx),
-            notify::Config::default()
-        ).unwrap();
-
+        let mut debouncer = new_debouncer(Duration::from_millis(1000), None, tx).unwrap();
     
         let watcher = debouncer.watcher();
-        for _path in self.paths.iter() {
-            //println!("path: {:?}", path);
-            //watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
+        for path in self.paths.iter() {
+            watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
         }
-        
-
-        let path = Path::new("/Users/surindersingh/Documents/dev/as/flow/workflow-dev/wahoo/test/src/templates/index.html");
-        watcher.watch(path, RecursiveMode::NonRecursive)?;
-
 
         log_info!("Server", "monitoring changes...",);
 
@@ -166,25 +59,41 @@ impl Server {
                 }
             }
         });
-        //let mut rx = rx.iter();
-        for (index, events) in rx.iter().enumerate() {
-            log_info!("", "");
-            log_info!("Event", "events: {}, {:?}", index, events);
 
-            log_info!("Event", "building1: {}", self.is_building());
-            //self.building(true);
-            log_info!("Event", "building2: {}", self.is_building());
-            
-            
+        let websockets = self.websockets.clone();
+        for (_index, events) in rx.iter().enumerate() {
+            log_info!("", "");
+            if events.is_err(){
+                continue;
+            }
+            //log_info!("Event", "events: {}, {:?}", index, events);
             let ctx = Arc::new(Context::create(self.location.clone(), Options::default()).await?);
             let build = Arc::new(Builder::new(ctx));
             build.execute().await?;
+            match websockets.clone().lock(){
+                Ok(websockets)=>{
+                    let files: Vec<String> = events.unwrap().iter().map(|a|{
+                        let str = a.path.as_os_str().to_str().unwrap().to_string();
+                        let mut parts = str.split("templates/");
+                        parts.next();
+                        parts.next().unwrap().to_string()
+                    }).collect();
+
+                    let noti = UpdateNotification{files};
+
+                    for (_id, stream) in websockets.iter(){
+                        let _ = stream
+                            .send_json(&noti)
+                            .await;
+                    }
+                }
+                _=>{
+
+                }
+            }
             log_info!("HTTP", "server listening on port {}", self.port);
             log_info!("Server", "monitoring changes...",);
-
-            self.building(false);
         }
-        println!("sssssss");
         Ok(())
     }
     
@@ -192,13 +101,12 @@ impl Server {
         let mut app = tide::new();
         app.with(tide::log::LogMiddleware::new());
         app.at("/").serve_dir("site/")?;
-        //app.at("/").serve_file("site/index.html")?;
+        app.at("/").serve_file("site/index.html")?;
 
         let this = self.clone();
         let websockets = this.websockets.clone();
-        //let x = Arc::new(123);
-        //let v = x.clone();
-        let (sender,receiver) = unbounded::<tide_websockets::WebSocketConnection>();
+
+        let (_sender, _receiver) = unbounded::<tide_websockets::WebSocketConnection>();
         app.at("/wahoo")
             .get(WebSocket::new(move |_request, mut stream| {
                 //let x = x.clone();
