@@ -71,29 +71,31 @@ impl Server {
 
         let this = self.clone();
         let websockets = this.websockets.clone();
-        let x = Arc::new(123);
-        // let v = x.clone();
+        //let x = Arc::new(123);
+        //let v = x.clone();
         let (sender,receiver) = unbounded::<tide_websockets::WebSocketConnection>();
         app.at("/wahoo")
-            .get(WebSocket::new(|_request, mut stream| async move {
-    
-            // let s = stream.clone();
-            let id = Id::new();
-
-            let y = x.clone();
-            // let w = websockets.clone(); 
-            // websockets.clone().lock().unwrap().insert(id, stream.clone());
-    
-            while let Some(Ok(Message::Text(input))) = stream.next().await {
-                let output: String = input.chars().rev().collect();
-    
-                stream
-                    .send_string(format!("{} | {}", &input, &output))
-                    .await?;
-            }
-    
-            Ok(())
-        }));
+            .get(WebSocket::new(move |_request, mut stream| {
+                //let x = x.clone();
+                let websockets = websockets.clone(); 
+                async move{
+                    // let s = stream.clone();
+                    let id = Id::new();
+     
+                    websockets.clone().lock().unwrap().insert(id, stream.clone());
+            
+                    while let Some(Ok(Message::Text(input))) = stream.next().await {
+                        let output: String = input.chars().rev().collect();
+            
+                        stream
+                            .send_string(format!("{} | {}", &input, &output))
+                            .await?;
+                    }
+            
+                    Ok(())
+                }
+            })
+        );
     
     
         let address = format!("127.0.0.1:{}", self.port);
