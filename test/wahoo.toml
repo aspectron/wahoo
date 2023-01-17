@@ -1,5 +1,9 @@
 [settings]
-ignore = ["ignore*"]
+ignore = [
+    "node_modules/material-design-lite/dist*",
+    "node_modules/material-design-lite/src*",
+    "templates*"
+]
 
 [site]
 title = "Test Site"
