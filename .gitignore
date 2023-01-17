@@ -3,3 +3,4 @@
 *.code-workspace
 analyzer-target
 /test/site
+.DS_Store

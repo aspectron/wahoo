@@ -7,6 +7,12 @@ use std::{collections::HashMap, time::Duration};
 use tide_websockets::{Message, WebSocket};
 use workflow_core::id::Id;
 
+use serde::Serialize;
+#[derive(Debug, Serialize)]
+struct UpdateNotification {
+    files: Vec<String>,
+}
+
 pub struct Server {
     // pub tide : tide::Server<()>,
     port: u16,
@@ -34,8 +40,8 @@ impl Server {
         let (tx, rx) = std::sync::mpsc::channel();
 
         // No specific tickrate, max debounce time 2 seconds
-        let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
-
+        let mut debouncer = new_debouncer(Duration::from_millis(1000), None, tx).unwrap();
+    
         let watcher = debouncer.watcher();
         for path in self.paths.iter() {
             println!("Watching {}", path.to_str().unwrap());
@@ -54,11 +60,37 @@ impl Server {
             }
         });
 
-        for _events in rx {
+        let websockets = self.websockets.clone();
+        for (_index, events) in rx.iter().enumerate() {
+            log_info!("", "");
+            if events.is_err(){
+                continue;
+            }
+            //log_info!("Event", "events: {}, {:?}", index, events);
             let ctx = Arc::new(Context::create(self.location.clone(), Options::default()).await?);
             let build = Arc::new(Builder::new(ctx));
             build.execute().await?;
-            self.post("update").await?;
+            match websockets.clone().lock(){
+                Ok(websockets)=>{
+                    let files: Vec<String> = events.unwrap().iter().map(|a|{
+                        let str = a.path.as_os_str().to_str().unwrap().to_string();
+                        let mut parts = str.split("templates/");
+                        parts.next();
+                        parts.next().unwrap().to_string()
+                    }).collect();
+
+                    let noti = UpdateNotification{files};
+
+                    for (_id, stream) in websockets.iter(){
+                        let _ = stream
+                            .send_json(&noti)
+                            .await;
+                    }
+                }
+                _=>{
+
+                }
+            }
             log_info!("HTTP", "server listening on port {}", self.port);
             log_info!("Server", "monitoring changes...",);
         }
@@ -89,6 +121,7 @@ impl Server {
 
         let this = self.clone();
         let websockets = this.websockets.clone();
+
         app.at("/wahoo")
             .get(WebSocket::new(move |_request, mut stream| {
                 let websockets = websockets.clone();
