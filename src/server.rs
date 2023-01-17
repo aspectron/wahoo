@@ -2,11 +2,10 @@ use crate::prelude::*;
 use async_std::prelude::*;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
-use std::{time::Duration, collections::HashMap};
-use tide_websockets::{Message, WebSocket};
-use async_std::channel::*;
-use workflow_core::id::Id;
 use std::sync::Mutex;
+use std::{collections::HashMap, time::Duration};
+use tide_websockets::{Message, WebSocket};
+use workflow_core::id::Id;
 
 pub struct Server {
     // pub tide : tide::Server<()>,
@@ -14,7 +13,7 @@ pub struct Server {
     location: Option<String>,
     paths: Vec<PathBuf>,
     // update : Receiver<()>,
-    websockets : Arc<Mutex<HashMap<Id,tide_websockets::WebSocketConnection>>>
+    websockets: Arc<Mutex<HashMap<Id, Arc<tide_websockets::WebSocketConnection>>>>,
 }
 
 impl Server {
@@ -24,7 +23,7 @@ impl Server {
             port,
             location,
             paths: paths.to_vec(),
-            websockets: Arc::new(Mutex::new(HashMap::new()))
+            websockets: Arc::new(Mutex::new(HashMap::new())),
         };
 
         Arc::new(server)
@@ -39,6 +38,7 @@ impl Server {
 
         let watcher = debouncer.watcher();
         for path in self.paths.iter() {
+            println!("Watching {}", path.to_str().unwrap());
             watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
         }
 
@@ -58,12 +58,29 @@ impl Server {
             let ctx = Arc::new(Context::create(self.location.clone(), Options::default()).await?);
             let build = Arc::new(Builder::new(ctx));
             build.execute().await?;
+            self.post("update").await?;
             log_info!("HTTP", "server listening on port {}", self.port);
             log_info!("Server", "monitoring changes...",);
         }
         Ok(())
     }
-    
+
+    async fn post(&self, msg: &str) -> Result<()> {
+        let websockets = self
+            .websockets
+            .lock()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for websocket in websockets {
+            websocket.send(Message::Text(msg.to_string())).await.ok();
+        }
+
+        Ok(())
+    }
+
     async fn http_server(self: Arc<Self>) -> Result<()> {
         let mut app = tide::new();
         app.with(tide::log::LogMiddleware::new());
@@ -72,38 +89,35 @@ impl Server {
 
         let this = self.clone();
         let websockets = this.websockets.clone();
-        //let x = Arc::new(123);
-        //let v = x.clone();
-        let (sender,receiver) = unbounded::<tide_websockets::WebSocketConnection>();
         app.at("/wahoo")
             .get(WebSocket::new(move |_request, mut stream| {
-                //let x = x.clone();
-                let websockets = websockets.clone(); 
-                async move{
-                    // let s = stream.clone();
+                let websockets = websockets.clone();
+                async move {
                     let id = Id::new();
-     
-                    websockets.clone().lock().unwrap().insert(id, stream.clone());
-            
-                    while let Some(Ok(Message::Text(input))) = stream.next().await {
-                        let output: String = input.chars().rev().collect();
-            
-                        stream
-                            .send_string(format!("{} | {}", &input, &output))
-                            .await?;
+
+                    websockets
+                        .clone()
+                        .lock()
+                        .unwrap()
+                        .insert(id, Arc::new(stream.clone()));
+
+                    while let Some(Ok(Message::Text(_input))) = stream.next().await {
+                        // let output: String = input.chars().rev().collect();
+                        // stream
+                        //     .send_string(format!("{} | {}", &input, &output))
+                        //     .await?;
                     }
-            
+
+                    websockets.clone().lock().unwrap().remove(&id);
+
                     Ok(())
                 }
-            })
-        );
-    
-    
+            }));
+
         let address = format!("127.0.0.1:{}", self.port);
         log_info!("HTTP", "server listening on {address}");
         app.listen(address).await?;
-    
+
         Ok(())
     }
 }
-
