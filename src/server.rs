@@ -18,18 +18,23 @@ pub struct Server {
     port: u16,
     location: Option<String>,
     paths: Vec<PathBuf>,
-    // update : Receiver<()>,
+    settings: Settings,
     websockets: Arc<Mutex<HashMap<Id, Arc<tide_websockets::WebSocketConnection>>>>,
 }
 
 impl Server {
-    pub fn new(port: u16, location: Option<String>, paths: &[PathBuf]) -> Arc<Server> {
+    pub fn new(
+        port: u16,
+        location: Option<String>,
+        paths: &[PathBuf],
+        settings: Settings,
+    ) -> Arc<Server> {
         let server = Self {
-            // tide: tide::new(),
             port,
             location,
             paths: paths.to_vec(),
             websockets: Arc::new(Mutex::new(HashMap::new())),
+            settings,
         };
 
         Arc::new(server)
@@ -110,7 +115,19 @@ impl Server {
         let mut app = tide::new();
         app.with(tide::log::LogMiddleware::new());
         app.at("/").serve_dir("site/")?;
-        app.at("/").serve_file("site/index.html")?;
+        if let Some(languages) = &self.settings.languages {
+            if languages.contains(&"en".to_string()) {
+                app.at("/").serve_file("site/en/index.html")?;
+            } else if !languages.is_empty() {
+                let locale = &languages[0];
+                app.at("/")
+                    .serve_file(format!("site/{locale}/index.html"))?;
+            } else {
+                app.at("/").serve_file("site/index.html")?;
+            }
+        } else {
+            app.at("/").serve_file("site/index.html")?;
+        }
 
         let this = self.clone();
         let websockets = this.websockets.clone();

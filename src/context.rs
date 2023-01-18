@@ -65,4 +65,11 @@ impl Context {
         }
         Ok(())
     }
+
+    pub fn settings(&self) -> Settings {
+        let default_settings = Settings::default();
+        let settings = self.manifest.settings.as_ref().unwrap_or(&default_settings);
+
+        settings.clone()
+    }
 }

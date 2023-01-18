@@ -293,13 +293,7 @@ impl Builder {
         let glob = "templates/**/*{.html,.js,.raw}";
         let include = Filter::new(&[glob]);
 
-        let default_settings = Settings::default();
-        let settings = self
-            .ctx
-            .manifest
-            .settings
-            .as_ref()
-            .unwrap_or(&default_settings);
+        let settings = self.ctx.settings();
 
         let exclude = if let Some(ignore) = &settings.ignore {
             let mut list = ignore.iter().map(|s| s.as_str()).collect::<Vec<_>>();
@@ -314,7 +308,7 @@ impl Builder {
         log_trace!("Migrate", "migrating files");
         self.migrate(&include, &exclude).await?;
         log_trace!("Render", "loading templates");
-        self.render(glob, &exclude, settings).await?;
+        self.render(glob, &exclude, &settings).await?;
         log_info!("Build", "done");
 
         Ok(())
