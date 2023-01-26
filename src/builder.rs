@@ -233,6 +233,9 @@ impl Builder {
                 language_list.push(lang.clone());
                 list.push((url_prefix, Some(locale.clone()), lang))
             }
+
+            self.render_redirecting_index_page(&mut tera, &mut context).await?;
+
             list
         } else {
             vec![(
@@ -286,6 +289,26 @@ impl Builder {
         Ok(())
     }
 
+    pub async fn render_redirecting_index_page(&self, tera: &mut tera::Tera, context: &mut tera::Context)-> Result<()> {
+        tera.add_raw_template(
+            "__INDEX__.html",
+            "<!DOCTYPE html><html lang=\"en-gb\"><head><script>window.location.href=\"/en/\";</script></head><body>Please wait. Redirecting...</body></html>"
+        )?;
+
+        let url_prefix = "/en/".to_string();
+
+        let language = Language {
+            name: "English".to_string(),
+            locale: "en".to_string(),
+        };
+
+        let content =
+            self.render_template(&tera, "__INDEX__.html", context, &language, &url_prefix)?;
+        self.save_file(&content, "index.html", None).await?;
+
+        Ok(())
+    }
+
     pub async fn execute(&self) -> Result<()> {
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
@@ -298,10 +321,11 @@ impl Builder {
         let exclude = if let Some(ignore) = &settings.ignore {
             let mut list = ignore.iter().map(|s| s.as_str()).collect::<Vec<_>>();
             list.push("partial*");
+            list.push("__INDEX__.html");
 
             Filter::new(&list)
         } else {
-            let list = vec!["partial*"];
+            let list = vec!["partial*", "__INDEX__.html"];
             Filter::new(&list)
         };
 
