@@ -234,7 +234,8 @@ impl Builder {
                 list.push((url_prefix, Some(locale.clone()), lang))
             }
 
-            self.render_redirecting_index_page(&mut tera, &mut context).await?;
+            self.render_redirecting_index_page(&mut tera, &mut context)
+                .await?;
 
             list
         } else {
@@ -289,10 +290,14 @@ impl Builder {
         Ok(())
     }
 
-    pub async fn render_redirecting_index_page(&self, tera: &mut tera::Tera, context: &mut tera::Context)-> Result<()> {
+    pub async fn render_redirecting_index_page(
+        &self,
+        tera: &mut tera::Tera,
+        context: &mut tera::Context,
+    ) -> Result<()> {
         tera.add_raw_template(
             "__INDEX__.html",
-            "<!DOCTYPE html><html lang=\"en-gb\"><head><script>window.location.href=\"/en/\";</script></head><body>Please wait. Redirecting...</body></html>"
+            "<!DOCTYPE html><html lang=\"en-gb\"><head><script>window.location.href=\"/en/index.html\";</script></head><body>Please wait. Redirecting...</body></html>"
         )?;
 
         let url_prefix = "/en/".to_string();
@@ -303,7 +308,7 @@ impl Builder {
         };
 
         let content =
-            self.render_template(&tera, "__INDEX__.html", context, &language, &url_prefix)?;
+            self.render_template(tera, "__INDEX__.html", context, &language, &url_prefix)?;
         self.save_file(&content, "index.html", None).await?;
 
         Ok(())
