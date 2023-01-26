@@ -153,7 +153,7 @@ impl Builder {
         let include_file = IncludeFile::new(project_folder.clone(), dir, context.clone());
 
         let project_folder = project_folder.join("templates");
-        let log = Log{};
+        let log = Log {};
 
         tera.register_filter("sort_object", sort_object);
         tera.register_filter("markdown", markdown_filter);
