@@ -23,8 +23,8 @@ tera = "1.17.1"
 thiserror = "1.0.38"
 tide = "0.16.0"
 tide-websockets = "0.4.0"
-tokio = { version = "1.20.1", features = ["full"] }
-toml = {version = "0.5.9", features = ["preserve_order"]}
+tokio = { version = "1.25.0", features = ["full"] }
+toml = {version = "0.7.1", features = ["preserve_order"]}
 walkdir = "2.3.2"
 workflow-core = { path = "../workflow-rs/core" }
 workflow-i18n = { path="../workflow-rs/i18n" }
