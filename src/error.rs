@@ -52,6 +52,6 @@ impl From<String> for Error {
 
 impl From<OsString> for Error {
     fn from(os_str: OsString) -> Error {
-        Error::OsString(format!("{:?}", os_str))
+        Error::OsString(format!("{os_str:?}"))
     }
 }

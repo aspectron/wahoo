@@ -15,7 +15,7 @@ impl Filter {
             .iter()
             .map(|glob| {
                 Glob::new(glob)
-                    .unwrap_or_else(|_| panic!("Error compiling glob: {}", glob))
+                    .unwrap_or_else(|_| panic!("Error compiling glob: {glob}"))
                     .compile_matcher()
             })
             .collect::<Vec<_>>();
@@ -279,7 +279,7 @@ impl tera::Filter for IncludeFile {
         }
 
         if !templates.contains(&template) {
-            return Err(format!("Template not found: {}", template).into());
+            return Err(format!("Template not found: {template}").into());
         }
 
         let mut context = Context::from_serialize(args)?;

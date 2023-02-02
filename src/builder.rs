@@ -115,7 +115,7 @@ impl Builder {
         log_info!(
             "Rendering",
             "{}",
-            style(format!("{url_prefix}{}", template)).blue()
+            style(format!("{url_prefix}{template}")).blue()
         );
         match tera.render(template, context) {
             Ok(s) => Ok(s),
@@ -139,8 +139,8 @@ impl Builder {
         let dir = dir.to_str().unwrap();
         let mut tera = match tera::Tera::new(dir) {
             Ok(t) => t,
-            Err(e) => {
-                println!("Parsing error(s): {}, glob:{}", e, glob);
+            Err(err) => {
+                println!("Parsing error(s): {err}, glob:{glob}");
                 ::std::process::exit(1);
             }
         };

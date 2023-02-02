@@ -51,7 +51,7 @@ impl Manifest {
         let toml: toml::Value = match toml::from_str(&toml_text) {
             Ok(manifest) => manifest,
             Err(err) => {
-                return Err(format!("Error loading nw.toml: {}", err).into());
+                return Err(format!("Error loading wahoo.toml: {err}").into());
             }
         };
 

@@ -73,15 +73,12 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
                     if title.is_empty() {
                         if new_window {
                             return Event::Html(CowStr::from(format!(
-                                "<a target=\"_blank\" href=\"{}{}\">",
-                                CowStr::from(prefix),
-                                href
+                                "<a target=\"_blank\" href=\"{prefix}{href}\">"
                             )));
                         } else {
                             return Event::Html(CowStr::from(format!(
-                                "<a href=\"{}{}\">",
-                                CowStr::from(prefix),
-                                href
+                                "<a href=\"{prefix}{href}\">",
+                                // CowStr::from(prefix)
                             )));
                         }
                     } else {
@@ -91,13 +88,11 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
                         let title = CowStr::from(title_);
                         if new_window {
                             return Event::Html(CowStr::from(format!(
-                                "<a target=\"_blank\" href=\"{}{}\" title=\"{}\">",
-                                prefix, href, title
+                                "<a target=\"_blank\" href=\"{prefix}{href}\" title=\"{title}\">"
                             )));
                         } else {
                             return Event::Html(CowStr::from(format!(
-                                "<a href=\"{}{}\" title=\"{}\">",
-                                prefix, href, title
+                                "<a href=\"{prefix}{href}\" title=\"{title}\">"
                             )));
                         }
                     }
