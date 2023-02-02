@@ -36,7 +36,7 @@ use server::Server;
 #[clap(name = "wahoo")]
 #[clap(about, author, version)]
 #[clap(
-    setting = clap::AppSettings::DeriveDisplayOrder,
+    // setting = clap::AppSettings::DeriveDisplayOrder,
 )]
 struct Args {
     /// Location of the nw.toml manifest file
