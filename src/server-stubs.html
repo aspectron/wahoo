@@ -16,7 +16,7 @@ function trunk(file, lang) {
 }
 
 function store_scroll_data() {
-    let scroll = document.getElementById("main").offsetParent.scrollTop;
+    let scroll = document.getElementById("main").scrollTop;
     localStorage.setItem('scroll', scroll);
     localStorage.setItem('page', window.location.pathname);
 
@@ -37,12 +37,17 @@ function restore_scroll_data() {
                 if (document.readyState === "complete") {
                     setTimeout(() => {
                         console.log("(actual) scrolling main to",scroll);
-                        document.getElementById("main").offsetParent.scrollTop = scroll;
+                        document.getElementById("main").scrollTop = scroll;
                     }, 0);
                 }
             };
         }
     }
+}
+
+function reload() {
+    window.location.hash = '';
+    window.location.reload();
 }
 
 addEventListener('beforeunload', (event) => {
@@ -59,7 +64,7 @@ function wahoo_connect() {
         socket.onopen = function(e) {
             console.log("[open] Connection established");
             if (was_open) {
-                window.location.reload();
+                reload();
             } else {
                 was_open = true;
             }
@@ -79,7 +84,7 @@ function wahoo_connect() {
                     for (let file of notification.params) {
                         let update = trunk(file);
                         if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial") || file.includes("menu")) {
-                            window.location.reload();
+                            reload();
                         } else {
                             console.log("ignoring update - current:",path,"update:",update);
                         }
