@@ -196,29 +196,10 @@ impl Server {
                 )
                 .into()
             })?;
-        if let Some(languages) = &self.settings.languages {
-            if languages.contains(&"en".to_string()) {
-                let target = self.site_folder.join("en/index.html");
-                app.at("/").serve_file(&target).map_err(|err| -> Error {
-                    format!("Unable to locate `{}`: {err}", target.display()).into()
-                })?;
-            } else if !languages.is_empty() {
-                let locale = &languages[0];
-                let target = self.site_folder.join(format!("{locale}/index.html"));
-                app.at("/").serve_file(&target).map_err(|err| -> Error {
-                    format!("Unable to locate `{}`: {err}", target.display()).into()
-                })?;
-            } else {
-                let target = self.site_folder.join("index.html");
-                app.at("/").serve_file(&target).map_err(|err| -> Error {
-                    format!(
-                        "Unable to locate target folder `{}`: {err}",
-                        target.display()
-                    )
-                    .into()
-                })?;
-            }
-        } else {
+
+        let empty_list = vec![];
+        let languages = self.settings.languages.as_ref().unwrap_or(&empty_list);
+        if languages.is_empty(){
             let target = self.site_folder.join("index.html");
             app.at("/").serve_file(&target).map_err(|err| -> Error {
                 format!(
@@ -227,6 +208,26 @@ impl Server {
                 )
                 .into()
             })?;
+        } else {
+            let root_locale = if languages.contains(&"en".to_string()){
+                "en"
+            }else{
+                languages[0].as_str()
+            };
+
+            let target = self.site_folder.join(format!("{root_locale}/index.html"));
+            app.at("/").serve_file(&target).map_err(|err| -> Error {
+                format!("Unable to locate `{}`: {err}", target.display()).into()
+            })?;
+
+            for locale in languages{
+                let target = self.site_folder.join(format!("{locale}/index.html"));
+                for path in [format!("/{locale}").as_str(), format!("/{locale}/").as_str()]{
+                    app.at(path).serve_file(&target).map_err(|err| -> Error {
+                        format!("Unable to locate `{}`: {err}", target.display()).into()
+                    })?;
+                }
+            }
         }
 
         let this = self.clone();
