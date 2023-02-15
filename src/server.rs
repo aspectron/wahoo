@@ -81,7 +81,7 @@ impl Server {
         let (tx, rx) = std::sync::mpsc::channel();
 
         // No specific tickrate, max debounce time 2 seconds
-        let mut debouncer = new_debouncer(Duration::from_millis(1000), None, tx).unwrap();
+        let mut debouncer = new_debouncer(Duration::from_millis(500), None, tx).unwrap();
 
         let watcher = debouncer.watcher();
         for path in self.paths.iter() {
