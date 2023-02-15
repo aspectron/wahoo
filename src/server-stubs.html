@@ -19,6 +19,9 @@ function store_scroll_data() {
     let scroll = document.getElementById("main").offsetParent.scrollTop;
     localStorage.setItem('scroll', scroll);
     localStorage.setItem('page', window.location.pathname);
+
+    // also in server mode, remove the hash to prevent auto-section scrolling on reload
+    window.location.hash = '';
 }
 
 
