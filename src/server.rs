@@ -6,6 +6,8 @@ use std::sync::Mutex;
 use std::{collections::HashMap, time::Duration};
 use tide_websockets::{Message, WebSocket};
 use workflow_core::id::Id;
+// use std::hash::BuildHasher;
+use ahash::RandomState;
 
 use serde::Serialize;
 // #[derive(Debug, Serialize)]
@@ -45,6 +47,7 @@ pub struct Server {
     settings: Settings,
     websockets: Arc<Mutex<HashMap<Id, Arc<tide_websockets::WebSocketConnection>>>>,
     session : Id,
+    hashes : Mutex<HashMap<String, u64>>,
 }
 
 impl Server {
@@ -67,6 +70,7 @@ impl Server {
             websockets: Arc::new(Mutex::new(HashMap::new())),
             settings,
             session: Id::new(),
+            hashes : Mutex::new(HashMap::new()),
         };
 
         Arc::new(server)
@@ -105,16 +109,29 @@ impl Server {
                 continue;
             }
             log_info!("Event", "events: {:?}", events);
-            let ctx = Arc::new(Context::create(self.location.clone(), Options { server : true }).await?);
-            let build = Arc::new(Builder::new(ctx));
-            build.execute().await?;
+
+            // Having this here, causes multiple refreshes when saving style.css
+            // let ctx = Arc::new(Context::create(self.location.clone(), Options { server : true }).await?);
+            // let build = Arc::new(Builder::new(ctx));
+            // build.execute().await?;
 
             let files: Vec<String> = events
                 .unwrap()
                 .iter()
-                .filter_map(|a| {
-                    let f = a.path.strip_prefix(&self.project_folder).expect("watched file is not in the project folder");
+                .filter_map(|event| {
+                    let f = event.path.strip_prefix(&self.project_folder).expect("watched file is not in the project folder");
                     let file_str = f.as_os_str().to_str().unwrap().to_string();
+
+                    let hash_builder = RandomState::with_seed(42);
+                    let content = std::fs::read_to_string(&event.path).ok();
+                    let hash = hash_builder.hash_one(content);
+                    if let Some(prev_hash) = self.hashes.lock().unwrap().insert(file_str.clone(), hash) {
+                        if hash == prev_hash {
+                            // println!("Skipping {}", file_str);
+                            return None;
+                        }
+                    }
+
                     if file_str.contains("templates/") {
                         let parts = file_str.split("templates/").collect::<Vec<_>>();
                         if parts.len() == 2 {
@@ -129,13 +146,20 @@ impl Server {
                 })
                 .collect();
 
-            // let noti = UpdateNotification { files };
-            // let str = serde_json::to_string(&noti)?;
-            let update = notification("update", files);
-            log_info!("Notification", "{}", update);
-            self.post(&update).await?;
-            log_info!("HTTP", "server listening on port {}", self.port);
-            log_info!("Server", "monitoring changes...",);
+            if !files.is_empty() {
+                
+                let ctx = Arc::new(Context::create(self.location.clone(), Options { server : true }).await?);
+                let build = Arc::new(Builder::new(ctx));
+                build.execute().await?;
+
+                // let noti = UpdateNotification { files }; 
+                // let str = serde_json::to_string(&noti)?;
+                let update = notification("update", files);
+                // log_info!("Notification", "{}", update);
+                self.post(&update).await?;
+                log_info!("HTTP", "server listening on port {}", self.port);
+                // log_info!("Server", "monitoring changes...",);
+            }
         }
         Ok(())
     }
