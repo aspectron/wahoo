@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use tera::Context;
 use walkdir::WalkDir;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Filter {
     matchers: Vec<GlobMatcher>,
 }
@@ -96,11 +96,11 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
         }
     } else if let Some(file) = args.get("file") {
         if let Some(file) = file.as_str() {
-            let file = project_folder.join(file);
-            content = match std::fs::read_to_string(&file) {
+            //let file = project_folder.join(file);
+            content = match std::fs::read_to_string(&project_folder.join(file)) {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    log_warn!("Markdown","Unable to read file `{}`: {}", file.display(), e);
+                    log_warn!("Markdown","Unable to read file `{}`: {}", file, e);
                     // return Err(
                     //     format!("Unable to read file {:?}, error: {}", file.to_str(), e).into(),
                     // );

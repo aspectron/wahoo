@@ -74,4 +74,11 @@ impl Manifest {
 pub struct Settings {
     pub ignore: Option<Vec<String>>,
     pub languages: Option<Vec<String>>,
+    pub map: Option<Vec<DataMap>>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct DataMap {
+    pub data: String,
+    pub templates: String
 }
