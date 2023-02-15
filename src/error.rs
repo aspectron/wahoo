@@ -1,11 +1,15 @@
 use globset::Error as GlobError;
 use std::ffi::OsString;
 use thiserror::Error;
+use tide::Error as TideError;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Error: {0}")]
     String(String),
+
+    #[error("TideError: {0}")]
+    TideError(TideError),
 
     #[error("Warning: {0}")]
     Warning(String),
@@ -47,6 +51,12 @@ impl From<&str> for Error {
 impl From<String> for Error {
     fn from(s: String) -> Self {
         Error::String(s)
+    }
+}
+
+impl From<TideError> for Error {
+    fn from(err: TideError) -> Self {
+        Error::TideError(err)
     }
 }
 

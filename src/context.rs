@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[derive(Default, Debug)]
 pub struct Options {
-    pub server : bool
+    pub server: bool,
 }
 
 #[derive(Debug)]
@@ -12,7 +12,7 @@ pub struct Context {
     pub site_folder: PathBuf,
     pub src_folder: PathBuf,
     pub project_folder: PathBuf,
-    pub options : Options,
+    pub options: Options,
 }
 
 impl Context {
@@ -61,7 +61,11 @@ impl Context {
             for entry in std::fs::read_dir(&self.site_folder)? {
                 let path = entry?.path();
                 if path.is_dir() {
-                    if !path.file_stem().map(|stem|stem.to_str().unwrap() == "node_modules").unwrap_or(false) {
+                    if !path
+                        .file_stem()
+                        .map(|stem| stem.to_str().unwrap() == "node_modules")
+                        .unwrap_or(false)
+                    {
                         async_std::fs::remove_dir_all(&path).await?;
                     }
                 } else {

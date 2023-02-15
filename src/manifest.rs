@@ -75,10 +75,12 @@ pub struct Settings {
     pub ignore: Option<Vec<String>>,
     pub languages: Option<Vec<String>>,
     pub map: Option<Vec<DataMap>>,
+    pub error_404: Option<String>,
+    pub error_500: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DataMap {
     pub data: String,
-    pub templates: String
+    pub templates: String,
 }
