@@ -16,7 +16,7 @@ function trunk(file, lang) {
 }
 
 function store_scroll_data() {
-    let scroll = document.getElementById("main").offsetParent.scrollTop;
+    let scroll = document.getElementById("main").scrollTop;
     localStorage.setItem('scroll', scroll);
     localStorage.setItem('page', window.location.pathname);
 
