@@ -1,0 +1,102 @@
+<script>
+let session = "";
+function init_session(session_id) {
+    // const current = localStorage.getItem('session');
+}
+
+function current() {
+    let file = window.location.pathname.split('/').slice(2).join('/');
+    let dot = file.lastIndexOf('.');
+    return file.substring(0, dot);
+}
+
+function trunk(file, lang) {
+    let dot = file.lastIndexOf('.');
+    return file.substring(0, dot);
+}
+
+function store_scroll_data() {
+    let scroll = document.getElementById("main").offsetParent.scrollTop;
+    localStorage.setItem('scroll', scroll);
+    localStorage.setItem('page', window.location.pathname);
+}
+
+
+function restore_scroll_data() {
+    let scroll = localStorage.getItem('scroll');
+    let page = localStorage.getItem('page');
+    if (scroll && scroll.length > 0) {
+        localStorage.removeItem('scroll');
+        localStorage.removeItem('page');
+        
+        if (page == window.location.pathname) {
+            document.onreadystatechange = () => {
+                if (document.readyState === "complete") {
+                    setTimeout(() => {
+                        console.log("(actual) scrolling main to",scroll);
+                        document.getElementById("main").offsetParent.scrollTop = scroll;
+                    }, 0);
+                }
+            };
+        }
+    }
+}
+
+addEventListener('beforeunload', (event) => {
+    store_scroll_data();
+    
+});
+
+
+let was_open = false;
+function wahoo_connect() {
+    let url = window.location.origin.replace("http","ws") + '/wahoo';
+    let socket = new WebSocket(url);
+
+        socket.onopen = function(e) {
+            console.log("[open] Connection established");
+            if (was_open) {
+                window.location.reload();
+            } else {
+                was_open = true;
+            }
+        };
+
+        socket.onmessage = function(event) {
+            // console.log(event.data);
+            // return;
+            let path = current();
+            let notification = JSON.parse(event.data);
+
+            switch (notification.method) {
+                case "session": {
+                    init_session(notification.params);
+                } break;
+                case "update": {
+                    for (let file of notification.params) {
+                        let update = trunk(file);
+                        if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial") || file.includes("menu")) {
+                            window.location.reload();
+                        } else {
+                            console.log("ignoring update - current:",path,"update:",update);
+                        }
+                    }
+                } break;
+            }
+        };
+
+        socket.onclose = function(event) {
+            setTimeout(() => {
+                wahoo_connect();
+            }, 1000);
+        };
+
+        socket.onerror = function(error) {
+            // console.log(`[error]`);
+            socket.close();
+        };
+    }
+
+    restore_scroll_data();
+    wahoo_connect();
+</script>

@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet};
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
 
+const SERVER_STUBS: &str = include_str!("./server-stubs.html");
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct Language {
     locale: String,
@@ -24,12 +26,12 @@ impl Builder {
 
     /// Migrate non-template files into the target directory
     pub async fn migrate(&self, include: &Filter, exclude: &Filter) -> Result<()> {
-        let list = WalkDir::new(&self.ctx.project_folder)
+        let list = WalkDir::new(&self.ctx.src_folder)
             .into_iter()
             .flatten()
             .filter_map(|entry| {
                 let path = entry.path();
-                let relative = path.strip_prefix(&self.ctx.project_folder).unwrap();
+                let relative = path.strip_prefix(&self.ctx.src_folder).unwrap();
 
                 let relative_str = relative.to_str().unwrap();
                 if relative_str.is_empty() || is_hidden(relative) {
@@ -63,11 +65,11 @@ impl Builder {
 
         for folder in folders {
             log_trace!("Migrate", "folder `{}`", folder.display());
-            std::fs::create_dir_all(self.ctx.target_folder.join(folder))?;
+            std::fs::create_dir_all(self.ctx.site_folder.join(folder))?;
         }
 
         for file in list {
-            let to_file = self.ctx.target_folder.join(&file);
+            let to_file = self.ctx.site_folder.join(&file);
             // println!("+{}",file.display());
             log_trace!(
                 "Migrate",
@@ -76,7 +78,7 @@ impl Builder {
                 file.display(),
                 to_file.display()
             );
-            std::fs::copy(self.ctx.project_folder.join(&file), to_file)?;
+            std::fs::copy(self.ctx.src_folder.join(&file), to_file)?;
         }
 
         Ok(())
@@ -89,9 +91,9 @@ impl Builder {
         language: Option<&String>,
     ) -> Result<()> {
         let target_file = if let Some(language) = language {
-            self.ctx.target_folder.join(language).join(template)
+            self.ctx.site_folder.join(language).join(template)
         } else {
-            self.ctx.target_folder.join(template)
+            self.ctx.site_folder.join(template)
         };
         log_trace!("Render", "{} `{}`", style("render:").cyan(), template);
         fs::write(target_file, content).await?;
@@ -118,7 +120,12 @@ impl Builder {
             style(format!("{url_prefix}{template}")).blue()
         );
         match tera.render(template, context) {
-            Ok(s) => Ok(s),
+            Ok(mut s) => {
+                if self.ctx.options.server {
+                    s += SERVER_STUBS;
+                }
+                Ok(s)
+            },
             Err(e) => {
                 let mut cause = e.source();
                 while let Some(e) = cause {
@@ -134,8 +141,8 @@ impl Builder {
 
     /// Render templates into the target directory
     pub async fn render(&self, glob: &str, exclude: &Filter, settings: &Settings) -> Result<()> {
-        let project_folder = self.ctx.project_folder.clone();
-        let dir = self.ctx.project_folder.join(glob);
+        let project_folder = self.ctx.src_folder.clone();
+        let dir = self.ctx.src_folder.join(glob);
         let dir = dir.to_str().unwrap();
         let mut tera = match tera::Tera::new(dir) {
             Ok(t) => t,
@@ -255,9 +262,9 @@ impl Builder {
 
         for (_, language, _) in &info {
             let path = if let Some(language) = language {
-                self.ctx.target_folder.join(language)
+                self.ctx.site_folder.join(language)
             } else {
-                self.ctx.target_folder.clone()
+                self.ctx.site_folder.clone()
             };
 
             for folder in &folders {
@@ -320,6 +327,8 @@ impl Builder {
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
 
+
+
         let glob = "templates/**/*{.html,.js,.raw}";
         let include = Filter::new(&[glob]);
 
@@ -341,6 +350,12 @@ impl Builder {
         log_trace!("Render", "loading templates");
         self.render(glob, &exclude, &settings).await?;
         log_info!("Build", "done");
+
+        let package_json = self.ctx.site_folder.join("package.json");
+        let node_modules = self.ctx.site_folder.join("node_modules");
+        if package_json.is_file() && !node_modules.is_dir() {
+            cmd!("npm", "install").dir(&self.ctx.site_folder).run()?;
+        }
 
         Ok(())
     }

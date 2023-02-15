@@ -100,9 +100,11 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
             content = match std::fs::read_to_string(&file) {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    return Err(
-                        format!("Unable to read file {:?}, error: {}", file.to_str(), e).into(),
-                    );
+                    log_warn!("Markdown","Unable to read file `{}`: {}", file.display(), e);
+                    // return Err(
+                    //     format!("Unable to read file {:?}, error: {}", file.to_str(), e).into(),
+                    // );
+                    Some("".to_string())
                 }
             };
         }

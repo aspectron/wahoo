@@ -92,18 +92,27 @@ pub async fn async_main() -> Result<()> {
             ctx.clean().await?;
         }
         Action::Serve { port } => {
-            let (settings, manifest_toml, project_folder) = {
-                let ctx = Arc::new(Context::create(location.clone(), Options::default()).await?);
+            let (settings, manifest_toml, src_folder, site_folder, project_folder) = {
+                let ctx = Arc::new(Context::create(location.clone(), Options { server : true }).await?);
                 let build = Arc::new(Builder::new(ctx.clone()));
                 build.execute().await?;
                 (
                     ctx.settings(),
                     ctx.manifest_toml.clone(),
+                    ctx.src_folder.clone(),
+                    ctx.site_folder.clone(),
                     ctx.project_folder.clone(),
                 )
             };
 
-            let server = Server::new(port, location, &[manifest_toml, project_folder], settings);
+            let server = Server::new(
+                port,
+                location,
+                project_folder,
+                site_folder,
+                &[manifest_toml, src_folder],
+                settings,
+            );
 
             server.run().await?;
         }
