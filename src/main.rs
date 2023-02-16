@@ -122,7 +122,7 @@ pub async fn async_main() -> Result<()> {
                     watch_targets.push(watch_target);
                 }
             }
-// println!("{:#?}", ctx.manifest.sections);
+            // println!("{:#?}", ctx.manifest.sections);
             if let Some(sections) = &ctx.manifest.sections {
                 for (_name, section) in sections.iter() {
                     if let Some(SectionSettings {

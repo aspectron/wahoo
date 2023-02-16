@@ -102,18 +102,23 @@ impl Manifest {
             }
         }
         // panic!();
-        let sections = if let Some(Settings { sections : Some(sections_list), .. }) = &settings {//toml.get("section") {
+        let sections = if let Some(Settings {
+            sections: Some(sections_list),
+            ..
+        }) = &settings
+        {
+            //toml.get("section") {
             // println!("loading section refs: {:#?}",sections);
             // let section_refs: HashMap<String, SectionReference> = sections.clone().try_into()?;
 
             let mut sections: HashMap<String, Section> = HashMap::new();
 
             // for (name, section_ref) in section_refs.into_iter() {
-            for section in sections_list.into_iter() {
+            for section in sections_list.iter() {
                 log_info!("Section", "loading {section}");
                 // if let Some(index) = &section_ref.index {
                 let section_toml = Self::load_toml(folder, &section).await?;
-                let section_path = folder.join(&section).canonicalize().unwrap();
+                let section_path = folder.join(section).canonicalize().unwrap();
                 imports.push(section_path);
                 let settings = if let Some(settings) = section_toml.get("settings") {
                     let settings: SectionSettings = settings.clone().try_into()?;
@@ -123,7 +128,12 @@ impl Manifest {
                 };
 
                 // let name = if le
-                let name = Path::new(section).file_stem().unwrap().to_str().unwrap().to_string();
+                let name = Path::new(section)
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
 
                 sections.insert(
                     name.clone(),
@@ -133,7 +143,6 @@ impl Manifest {
                         toml: section_toml,
                     },
                 );
-                
             }
             Some(sections)
         } else {
@@ -172,7 +181,7 @@ pub struct DataMap {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct  Section {
+pub struct Section {
     pub name: String,
     // pub index: Option<String>,
     pub settings: Option<SectionSettings>,
