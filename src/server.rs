@@ -53,7 +53,7 @@ pub struct Server {
     location: Option<String>,
     project_folder: PathBuf,
     site_folder: PathBuf,
-    paths: Vec<PathBuf>,
+    watch_targets: Vec<PathBuf>,
     settings: Settings,
     websockets: Arc<Mutex<HashMap<Id, Arc<tide_websockets::WebSocketConnection>>>>,
     session: Id,
@@ -67,7 +67,7 @@ impl Server {
         location: Option<String>,
         project_folder: PathBuf,
         site_folder: PathBuf,
-        paths: &[PathBuf],
+        watch_targets: &[PathBuf],
         settings: Settings,
     ) -> Arc<Server> {
         let server = Self {
@@ -76,7 +76,7 @@ impl Server {
             location,
             project_folder,
             site_folder,
-            paths: paths.to_vec(),
+            watch_targets: watch_targets.to_vec(),
             websockets: Arc::new(Mutex::new(HashMap::new())),
             settings,
             session: Id::new(),
@@ -94,8 +94,8 @@ impl Server {
         let mut debouncer = new_debouncer(Duration::from_millis(500), None, tx).unwrap();
 
         let watcher = debouncer.watcher();
-        for path in self.paths.iter() {
-            log_info!("Watching", "{}", path.to_str().unwrap());
+        for path in self.watch_targets.iter() {
+            log_info!("Watching", "{}", style(path.to_str().unwrap()).cyan());
             watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
         }
 

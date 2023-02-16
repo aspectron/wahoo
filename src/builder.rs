@@ -126,78 +126,25 @@ impl Builder {
                 }
                 Ok(s)
             }
-            Err(e) => {
-                let mut cause = e.source();
-                while let Some(e) = cause {
+            Err(err) => {
+                let mut error_string = String::new();
+                let mut cause = err.source();
+                while let Some(err) = cause {
                     println!();
-                    log_error!("{}", e);
-                    cause = e.source();
+                    log_error!("{}", err);
+                    error_string += &format!("<code>{err}</code>\n");
+                    cause = err.source();
                 }
 
-                Err(e.into())
-            }
-        }
-    }
-
-    fn create_template_to_key_path(&self, template: &str, key_path: &[String]) -> Vec<String> {
-        let file_name = Path::new(template)
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string();
-        let mut path = key_path.to_owned();
-        path.push(file_name);
-        path
-    }
-
-    fn data_key_exists(
-        &self,
-        template: &str,
-        key_path: &[String],
-        data: &tera::Context,
-    ) -> (bool, Vec<String>) {
-        let path = self.create_template_to_key_path(template, key_path);
-
-        //println!("data_key_exists: path: {:?}", path);
-
-        if let Some(mut data) = data.get(&path[0]) {
-            for index in 1..path.len() {
-                if let Some(value) = data.get(&path[index]) {
-                    //println!("key:{}, value: => {:?}", path[index], value);
-                    data = value;
+                // Err(e.into())
+                if self.ctx.options.server {
+                    error_string += SERVER_STUBS;
+                    Ok(error_string)
                 } else {
-                    return (false, path);
-                }
-            }
-
-            return (true, path);
-        }
-
-        (false, path)
-    }
-
-    fn check_data_key(
-        &self,
-        template: &str,
-        data_map: &Vec<(Filter, Vec<String>)>,
-        data: &tera::Context,
-    ) -> (bool, Option<Vec<String>>) {
-        if data_map.is_empty() {
-            return (true, None);
-        }
-
-        for (filter, path) in data_map {
-            if filter.is_match(template) {
-                let (key_exists, key) = self.data_key_exists(template, path, data);
-                if !key_exists {
-                    //println!("##########, {}, {:?}", template, path);
-                    return (false, Some(key));
+                    Ok(error_string)
                 }
             }
         }
-
-        (true, None)
     }
 
     /// Render templates into the target directory
@@ -339,28 +286,6 @@ impl Builder {
             }
         }
 
-        let data_map = if let Some(data_maps) = settings.map.clone() {
-            let mut list = vec![];
-
-            for data_map in data_maps {
-                let tpl_list = vec![data_map.templates.as_str()];
-                list.push((Filter::new(&tpl_list), vec![data_map.data]));
-            }
-
-            list
-        } else {
-            vec![]
-        };
-
-        {
-            if let Some(v) = context.get("project") {
-                //println!("### project: {:?}", v);
-                if let Some(_aa) = v.as_object() {
-                    //println!("### project.workflow : {:?}", aa.get("workflow"));
-                }
-            }
-        }
-
         log_info!("Render", "rendering");
         for template in tera.get_template_names() {
             if is_hidden(template) {
@@ -369,19 +294,6 @@ impl Builder {
 
             if exclude.is_match(template) {
                 log_trace!("Render", "{} `{}`", style("ignore:").yellow(), template);
-                continue;
-            }
-
-            let data_info = self.check_data_key(template, &data_map, &context);
-            if !data_info.0 {
-                let key = data_info.1.unwrap_or(vec![]).join(".");
-                log_warn!(
-                    "Render",
-                    "{} `{}`, {}",
-                    style("ignore:").red(),
-                    template,
-                    style(format!("(missing #[{key}] in toml)")).red()
-                );
                 continue;
             }
 

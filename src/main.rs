@@ -82,9 +82,12 @@ pub async fn async_main() -> Result<()> {
     match action {
         Action::Build {} => {
             let ctx = Arc::new(Context::create(location, Options::default()).await?);
-            let build = Arc::new(Builder::new(ctx));
+            let build = Arc::new(Builder::new(ctx.clone()));
             build.execute().await?;
             println!();
+
+            // ~~~
+            // println!("{:#?}", ctx.manifest);
         }
         Action::Clean {} => {
             let ctx = Arc::new(Context::create(location, Options::default()).await?);
@@ -92,27 +95,61 @@ pub async fn async_main() -> Result<()> {
             ctx.clean().await?;
         }
         Action::Serve { port } => {
-            let (settings, manifest_toml, src_folder, site_folder, project_folder) = {
+            let ctx = {
                 let ctx =
                     Arc::new(Context::create(location.clone(), Options { server: true }).await?);
                 let build = Arc::new(Builder::new(ctx.clone()));
                 build.execute().await?;
-                (
-                    ctx.settings(),
-                    ctx.manifest_toml.clone(),
-                    ctx.src_folder.clone(),
-                    ctx.site_folder.clone(),
-                    ctx.project_folder.clone(),
-                )
+                ctx
             };
+
+            let mut watch_targets = ctx.manifest.imports.clone();
+            watch_targets.extend([ctx.manifest_toml.clone(), ctx.src_folder.clone()]);
+
+            if let Some(Settings {
+                watch: Some(watch), ..
+            }) = &ctx.manifest.settings
+            {
+                for folder in watch.iter() {
+                    let target_folder = ctx.project_folder.join(folder);
+                    let watch_target = target_folder.canonicalize().unwrap_or_else(|err| {
+                        format!(
+                            "Unable to locate watch target `{}`: {err}",
+                            target_folder.display()
+                        )
+                        .into()
+                    });
+                    watch_targets.push(watch_target);
+                }
+            }
+// println!("{:#?}", ctx.manifest.sections);
+            if let Some(sections) = &ctx.manifest.sections {
+                for (_name, section) in sections.iter() {
+                    if let Some(SectionSettings {
+                        folder: Some(folder),
+                        ..
+                    }) = &section.settings
+                    {
+                        let target_folder = ctx.project_folder.join(folder);
+                        let watch_target = target_folder.canonicalize().unwrap_or_else(|err| {
+                            format!(
+                                "Unable to locate section folder `{}`: {err}",
+                                target_folder.display()
+                            )
+                            .into()
+                        });
+                        watch_targets.push(watch_target);
+                    }
+                }
+            }
 
             let server = Server::new(
                 port,
                 location,
-                project_folder,
-                site_folder,
-                &[manifest_toml, src_folder],
-                settings,
+                ctx.project_folder.clone(),
+                ctx.site_folder.clone(),
+                &watch_targets,
+                ctx.settings(),
             );
 
             server.run().await?;
