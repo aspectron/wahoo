@@ -3,6 +3,7 @@ use crate::prelude::*;
 #[derive(Default, Debug)]
 pub struct Options {
     pub server: bool,
+    pub verbose: bool,
 }
 
 #[derive(Debug)]
@@ -18,18 +19,21 @@ pub struct Context {
 impl Context {
     pub async fn create(
         location: Option<String>,
-        // output : Option<String>,
         options: Options,
     ) -> Result<Context> {
         let manifest_toml = Manifest::locate(location).await?;
-        log_info!("Manifest", "`{}`", manifest_toml.to_str().unwrap());
+
         let manifest = Manifest::load(&manifest_toml).await?;
         let project_folder = manifest_toml.parent().unwrap().to_path_buf();
-
+        
         let site_folder = project_folder.join("site");
         let src_folder = project_folder.join("src");
-        log_info!("Project", "`{}`", src_folder.to_str().unwrap());
-        log_info!("Target", "`{}`", site_folder.to_str().unwrap());
+
+        if options.verbose {
+            log_info!("Manifest", "`{}`", manifest_toml.to_str().unwrap());
+            log_info!("Project", "`{}`", src_folder.to_str().unwrap());
+            log_info!("Target", "`{}`", site_folder.to_str().unwrap());
+        }
 
         let ctx = Context {
             manifest,

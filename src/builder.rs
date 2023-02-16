@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, time::Instant};
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
 
@@ -114,11 +114,12 @@ impl Builder {
         context.insert("locale", &language.locale);
         context.insert("selected_language", &language);
 
-        log_info!(
+        log_trace!(
             "Rendering",
             "{}",
             style(format!("{url_prefix}{template}")).blue()
         );
+
         match tera.render(template, context) {
             Ok(mut s) => {
                 if self.ctx.options.server {
@@ -130,7 +131,6 @@ impl Builder {
                 let mut error_string = String::new();
                 let mut cause = err.source();
                 while let Some(err) = cause {
-                    println!();
                     log_error!("{}", err);
                     error_string += &format!("<code>{err}</code>\n");
                     cause = err.source();
@@ -286,7 +286,7 @@ impl Builder {
             }
         }
 
-        log_info!("Render", "rendering");
+        log_trace!("Render", "rendering");
         for template in tera.get_template_names() {
             if is_hidden(template) {
                 continue;
@@ -356,11 +356,13 @@ impl Builder {
             Filter::new(&list)
         };
 
+        let render_start = Instant::now();
         log_trace!("Migrate", "migrating files");
         self.migrate(&include, &exclude).await?;
         log_trace!("Render", "loading templates");
         self.render(glob, &exclude, &settings).await?;
-        log_info!("Build", "done");
+        let duration = render_start.elapsed();
+        log_info!("Build", "rendering complete in {} msec", duration.as_millis());
 
         let package_json = self.ctx.site_folder.join("package.json");
         let node_modules = self.ctx.site_folder.join("node_modules");

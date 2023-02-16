@@ -115,7 +115,7 @@ impl Manifest {
 
             // for (name, section_ref) in section_refs.into_iter() {
             for section in sections_list.iter() {
-                log_info!("Section", "loading {section}");
+                log_trace!("Section", "loading {section}");
                 // if let Some(index) = &section_ref.index {
                 let section_toml = Self::load_toml(folder, &section).await?;
                 let section_path = folder.join(section).canonicalize().unwrap();

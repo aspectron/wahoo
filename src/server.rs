@@ -51,6 +51,7 @@ where
 pub struct Server {
     // ctx : Arc<Context>,
     // pub tide : tide::Server<()>,
+    // verbose: bool,
     port: u16,
     location: Option<String>,
     project_folder: PathBuf,
@@ -60,6 +61,7 @@ pub struct Server {
     websockets: Arc<Mutex<HashMap<Id, Arc<tide_websockets::WebSocketConnection>>>>,
     session: Id,
     hashes: Mutex<HashMap<String, u64>>,
+    // verbose: bool,
 }
 
 impl Server {
@@ -71,6 +73,7 @@ impl Server {
         site_folder: PathBuf,
         watch_targets: &[PathBuf],
         settings: Settings,
+        // verbose : bool,
     ) -> Arc<Server> {
         let server = Self {
             // ctx : ctx.clone(),
@@ -83,6 +86,7 @@ impl Server {
             settings,
             session: Id::new(),
             hashes: Mutex::new(HashMap::new()),
+            // verbose
         };
 
         Arc::new(server)
@@ -97,7 +101,7 @@ impl Server {
 
         let watcher = debouncer.watcher();
         for path in self.watch_targets.iter() {
-            log_info!("Watching", "{}", style(path.to_str().unwrap()).cyan());
+            log_trace!("Watching", "{}", style(path.to_str().unwrap()).cyan());
             watcher.watch(Path::new(&path), RecursiveMode::Recursive)?;
         }
 
@@ -120,7 +124,7 @@ impl Server {
             if events.is_err() {
                 continue;
             }
-            log_info!("Event", "events: {:?}", events);
+            // log_info!("Event", "events: {:?}", events);
 
             // Having this here, causes multiple refreshes when saving style.css
             // let ctx = Arc::new(Context::create(self.location.clone(), Options { server : true }).await?);
@@ -165,7 +169,10 @@ impl Server {
 
             if !files.is_empty() {
                 let ctx = Arc::new(
-                    Context::create(self.location.clone(), Options { server: true }).await?,
+                    Context::create(self.location.clone(), Options { 
+                        server: true,
+                        ..Options::default()
+                    }).await?,
                 );
                 let site_folder = ctx.site_folder.clone();
                 let build = Arc::new(Builder::new(ctx));
@@ -180,7 +187,7 @@ impl Server {
                 let update_json_file = site_folder.join("__wahoo.json");
                 std::fs::write(update_json_file, update).ok();
 
-                log_info!("HTTP", "server listening on port {}", self.port);
+                log_trace!("HTTP", "server listening on port {}", self.port);
                 // log_info!("Server", "monitoring changes...",);
             }
         }

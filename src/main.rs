@@ -97,7 +97,7 @@ pub async fn async_main() -> Result<()> {
         Action::Serve { port } => {
             let ctx = {
                 let ctx =
-                    Arc::new(Context::create(location.clone(), Options { server: true }).await?);
+                    Arc::new(Context::create(location.clone(), Options { server: true, verbose : true }).await?);
                 let build = Arc::new(Builder::new(ctx.clone()));
                 build.execute().await?;
                 ctx
