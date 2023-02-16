@@ -304,6 +304,11 @@ impl Builder {
             }
         }
 
+        if self.ctx.options.server  {
+            let update_json_file = self.ctx.site_folder.join("__wahoo.json");
+            std::fs::write(update_json_file,"{}").ok();
+        }
+
         Ok(())
     }
 

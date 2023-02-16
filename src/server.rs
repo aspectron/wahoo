@@ -30,6 +30,7 @@ struct Notification<Msg>
 where
     Msg: Serialize,
 {
+    id: String,
     method: String,
     params: Msg,
 }
@@ -39,6 +40,7 @@ where
     P: Serialize,
 {
     let notification = Notification {
+        id : Id::new().to_string(),
         method: method.to_string(),
         params,
     };
@@ -165,6 +167,7 @@ impl Server {
                 let ctx = Arc::new(
                     Context::create(self.location.clone(), Options { server: true }).await?,
                 );
+                let site_folder = ctx.site_folder.clone();
                 let build = Arc::new(Builder::new(ctx));
                 build.execute().await?;
 
@@ -173,6 +176,10 @@ impl Server {
                 let update = notification("update", files);
                 // log_info!("Notification", "{}", update);
                 self.post(&update).await?;
+
+                let update_json_file = site_folder.join("__wahoo.json");
+                std::fs::write(update_json_file, update).ok();
+
                 log_info!("HTTP", "server listening on port {}", self.port);
                 // log_info!("Server", "monitoring changes...",);
             }

@@ -57,54 +57,100 @@ addEventListener('beforeunload', (event) => {
 
 
 let was_open = false;
+let ws_connected = false;
 function wahoo_connect() {
     let url = window.location.origin.replace("http","ws") + '/wahoo';
     let socket = new WebSocket(url);
 
-        socket.onopen = function(e) {
-            console.log("[open] Connection established");
-            if (was_open) {
-                reload();
-            } else {
-                was_open = true;
-            }
-        };
+    socket.onopen = function(e) {
+        console.log("[open] Connection established");
+        ws_connected = true;
+        if (was_open) {
+            reload();
+        } else {
+            was_open = true;
+        }
+    };
 
-        socket.onmessage = function(event) {
-            // console.log(event.data);
-            // return;
-            let path = current();
-            let notification = JSON.parse(event.data);
+    socket.onmessage = function(event) {
+        // console.log(event.data);
+        // return;
+        let notification = JSON.parse(event.data);
 
-            switch (notification.method) {
-                case "session": {
-                    init_session(notification.params);
-                } break;
-                case "update": {
-                    for (let file of notification.params) {
-                        let update = trunk(file);
-                        if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial") || file.includes("menu")) {
-                            reload();
-                        } else {
-                            console.log("ignoring update - current:",path,"update:",update);
-                        }
-                    }
-                } break;
-            }
-        };
+        switch (notification.method) {
+            case "session": {
+                init_session(notification.params);
+            } break;
+            case "update": {
+                handle_update_notification(notification.params);
+            } break;
+        }
+    };
 
-        socket.onclose = function(event) {
-            setTimeout(() => {
-                wahoo_connect();
-            }, 1000);
-        };
+    socket.onclose = function(event) {
+        ws_connected = false;
+        setTimeout(() => {
+            wahoo_connect();
+        }, 1000);
+    };
 
-        socket.onerror = function(error) {
-            // console.log(`[error]`);
-            socket.close();
-        };
+    socket.onerror = function(error) {
+        // console.log(`[error]`);
+        socket.close();
+    };
+}
+
+function handle_update_notification(files) {
+    let path = current();
+    for (let file of files) {
+        let update = trunk(file);
+        if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial") || file.includes("menu")) {
+            reload();
+        } else {
+            console.log("ignoring update - current:",path,"update:",update);
+        }
     }
 
-    restore_scroll_data();
-    wahoo_connect();
+}
+
+let last_poll_id = null;
+function poll() {
+    httpRequest = new XMLHttpRequest();
+
+    if (!httpRequest) {
+        alert("Giving up :( Cannot create an XMLHTTP instance");
+        return false;
+    }
+
+    httpRequest.onreadystatechange = () => {
+        if (ws_connected) {
+            return;
+        }
+
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+            if (httpRequest.status === 200) {
+                let notification = JSON.parse(httpRequest.responseText);
+                if (notification.method == "update") {
+                    if (notification.id != last_poll_id) {
+                        if (last_poll_id != null) {
+                            handle_update_notification(notification.params);
+                        }
+                        last_poll_id = notification.id;
+                    }
+                }
+            }
+
+            setTimeout(() => {
+                poll();
+            }, 1000);
+        }
+    };
+    httpRequest.open("GET", "/__wahoo.json");
+    httpRequest.send();
+
+}
+
+restore_scroll_data();
+wahoo_connect();
+// poll();
 </script>
