@@ -96,7 +96,7 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
         }
     } else if let Some(file) = args.get("file") {
         if let Some(file) = file.as_str() {
-            //let file = project_folder.join(file);
+            //let complete_path = project_folder.join(file);
             content = match std::fs::read_to_string(project_folder.join(file)) {
                 Ok(c) => Some(c),
                 Err(e) => {
@@ -267,7 +267,7 @@ impl tera::Filter for IncludeFile {
         }
         let mut template = value.as_str().unwrap();
 
-        let tera = self.create_tera();
+        let mut tera = self.create_tera();
 
         let templates: Vec<&str> = tera.get_template_names().collect();
         let mut rendering_fallback = false;
@@ -281,11 +281,23 @@ impl tera::Filter for IncludeFile {
         }
 
         if !templates.contains(&template) {
-            return Err(format!("Template not found: {template}").into());
+            let path = self.project_folder.join("templates").join(template);
+            if path.exists(){
+                let path = path.canonicalize()?;
+                //println!("path: {:?}", path);
+                tera.add_template_file(
+                    path,
+                    Some(template)
+                )?;
+            }else{
+                return Err(format!("Template not found: {template}").into());
+            }
         }
 
-        let mut context = Context::from_serialize(args)?;
-        context.insert("super".to_string(), &self.context.clone().into_json());
+        let mut context = self.context.clone();
+        context.extend(Context::from_serialize(args)?);
+        
+        //let context = self.context.clone();
 
         //tera.add_template_file();
         /*

@@ -199,6 +199,8 @@ pub struct SectionSettings {
     // description: Option<String>,
     pub index: Option<String>,
     pub template: Option<String>,
+    /// render each file entry of `Self::folder` directory via `Self::template`
+    pub enumerate: Option<bool>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

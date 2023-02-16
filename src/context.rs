@@ -17,15 +17,12 @@ pub struct Context {
 }
 
 impl Context {
-    pub async fn create(
-        location: Option<String>,
-        options: Options,
-    ) -> Result<Context> {
+    pub async fn create(location: Option<String>, options: Options) -> Result<Context> {
         let manifest_toml = Manifest::locate(location).await?;
 
         let manifest = Manifest::load(&manifest_toml).await?;
         let project_folder = manifest_toml.parent().unwrap().to_path_buf();
-        
+
         let site_folder = project_folder.join("site");
         let src_folder = project_folder.join("src");
 
@@ -87,5 +84,17 @@ impl Context {
         let settings = self.manifest.settings.as_ref().unwrap_or(&default_settings);
 
         settings.clone()
+    }
+
+    pub fn sections(&self) -> Option<HashMap<String, toml::Value>> {
+        if let Some(sections) = self.manifest.sections.as_ref() {
+            let mut result = HashMap::new();
+            for (key, section) in sections {
+                result.insert(key.clone(), section.toml.clone());
+            }
+            Some(result)
+        } else {
+            None
+        }
     }
 }

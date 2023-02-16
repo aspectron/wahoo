@@ -40,7 +40,7 @@ where
     P: Serialize,
 {
     let notification = Notification {
-        id : Id::new().to_string(),
+        id: Id::new().to_string(),
         method: method.to_string(),
         params,
     };
@@ -169,10 +169,14 @@ impl Server {
 
             if !files.is_empty() {
                 let ctx = Arc::new(
-                    Context::create(self.location.clone(), Options { 
-                        server: true,
-                        ..Options::default()
-                    }).await?,
+                    Context::create(
+                        self.location.clone(),
+                        Options {
+                            server: true,
+                            ..Options::default()
+                        },
+                    )
+                    .await?,
                 );
                 let site_folder = ctx.site_folder.clone();
                 let build = Arc::new(Builder::new(ctx));
