@@ -5,7 +5,9 @@ use std::{
 };
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
-use tera::Filter as TeraFilter;
+use tera::{Filter as TeraFilter};
+//use tera::Function;
+use std::sync::Mutex;
 
 const SERVER_STUBS: &str = include_str!("./server-stubs.html");
 
@@ -15,9 +17,10 @@ struct Language {
     name: String,
 }
 
+#[derive(Clone)]
 pub struct Builder {
     ctx: Arc<Context>,
-    i18n_dict: Dict,
+    i18n_dict: Arc<Dict>,
 }
 
 pub struct SectionInfo{
@@ -30,7 +33,7 @@ impl Builder {
     pub fn new(ctx: Arc<Context>) -> Builder {
         Builder {
             ctx,
-            i18n_dict: Dict::default(),
+            i18n_dict: Arc::new(Dict::default()),
         }
     }
 
@@ -191,7 +194,7 @@ impl Builder {
 
         let include_file = IncludeFile::new(project_folder.clone(), dir, context.clone());
 
-        let project_folder = project_folder.join("templates");
+        let templates_folder = project_folder.join("templates");
         let log = Log {};
 
         tera.register_filter("sort_object", sort_object);
@@ -199,35 +202,55 @@ impl Builder {
         tera.register_filter("include_file", include_file.clone());
         tera.register_filter("log", log);
 
+        let get_arg = |name:&str, args: &HashMap<String, tera::Value>|->tera::Result<String>{
+            let value = if let Some(value) = args.get(name) {
+                if let Some(value) = value.as_str() {
+                    value
+                }else{
+                    return Err(format!("invalid `{name}` ({value:?}) argument").into())
+                }
+            }else{
+                return Err(format!("`{name}` argument is missing").into())
+            };
+
+            Ok(value.to_string())
+        };
+
         tera.register_function(
             "include_file",
             move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
-                let file = if let Some(file) = args.get("file") {
-                    if file.is_string() {
-                        file
-                    }else{
-                        return Err(format!("invalid `file` ({file:?}) argument").into())
-                    }
-                }else{
-                    return Err("`file` argument is missing".into())
-                };
+                let file = get_arg("file", args)?;
 
-                let value = include_file.filter(file, args)?;
+                let value = include_file.filter(&file.into(), args)?;
                 Ok(value)
             },
         );
-        let project_folder_ = project_folder.clone();
+        let templates_folder_ = templates_folder.clone();
         tera.register_function(
             "markdown",
             move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
-                let value = markdown(&project_folder_, args)?;
+                let value = markdown(&templates_folder_, args)?;
                 Ok(value)
             },
         );
+        let templates_folder_ = templates_folder.clone();
+        tera.register_function(
+            "save_file",
+            move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
+                let file = get_arg("file", args)?;
+                let content = get_arg("content", args)?;
+                let path = templates_folder_.join(file);
+
+                log_trace!("SaveFile", "{} `{:?}`", style("save_file:").cyan(), path);
+                std::fs::write(path, content)?;
+                Ok(tera::Value::Bool(true))
+            },
+        );
+        let templates_folder_ = templates_folder.clone();
         tera.register_function(
             "read_md_files",
             move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
-                let value = read_md_files(&project_folder, args)?;
+                let value = read_md_files(&templates_folder_, args)?;
                 Ok(value)
             },
         );
@@ -320,6 +343,57 @@ impl Builder {
                 std::fs::create_dir_all(path.join(folder))?;
             }
         }
+
+        struct RenderFile{
+            callback: Arc<Mutex<dyn FnMut(&HashMap<String, tera::Value>) -> tera::Result<tera::Value> + Sync + Send>>
+        }
+
+        impl tera::Function for RenderFile{
+            fn call(&self, args: &HashMap<String, tera::Value>) -> tera::Result<tera::Value> {
+                if let Ok(f) = self.callback.lock().as_mut(){
+                    (f)(args)
+                }else{
+                    Ok(tera::Value::Null)
+                }
+            }
+        }
+
+        let info_ = info.clone();
+        let this = self.clone();
+        let tera_ = tera.clone();
+        let mut context_ = context.clone();
+        tera.register_function(
+            "render_file",
+            RenderFile{
+                callback: Arc::new(Mutex::new(move |args: &HashMap<String, tera::Value>|->tera::Result<tera::Value>{
+                    let template = get_arg("file", args)?;
+                    let destination = get_arg("dest", args)?;
+
+                    log_info!("RenderFile", "{} `{:?}` => {}", style("render_file:").cyan(), template, destination);
+                    for (url_prefix, folder, language) in &info_ {
+                        context_.extend(tera::Context::from_serialize(args).unwrap());
+                        let content =
+                            this.render_template(&tera_, &template, &mut context_, language, url_prefix);
+                        let this_ = this.clone();
+                        if let Ok(content) = content{
+                            let template_ = template.clone();
+                            let destination_ = destination.clone();
+                            let folder_ = folder.clone();
+                            workflow_core::task::spawn(async move{
+                                this_.save_file(&content, &destination_, folder_.as_ref()).await.map_err(|err|{
+                                    log_warn!("RenderFile", "Unable to render template: {template_}, error: {err:?}");
+                                }).ok();
+                            });
+                        }else{
+                            log_warn!("RenderFile", "Unable to render template: {template}, error: {content:?}");
+                        }
+                    }
+                    Ok(tera::Value::Bool(true))
+                }))
+            },
+        );
+
+        
 
         log_trace!("Render", "rendering");
         

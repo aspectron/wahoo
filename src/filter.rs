@@ -131,80 +131,87 @@ pub fn read_md_files(
     project_folder: &PathBuf,
     args: &HashMap<String, Value>,
 ) -> tera::Result<Value> {
-    let mut dir_path = None;
-    if let Some(file) = args.get("dir") {
+    let dir_path = if let Some(file) = args.get("dir") {
         if let Some(file) = file.as_str() {
-            dir_path = Some(project_folder.join(file));
+            file
+        }else{
+            return Err("read_md_files: Unable to parse directory path from arguments".into())
         }
     } else {
-        return Err("Use {% parse_md_files(dir=\"path/to/directory\") %}".into());
+        return Err("Use {% read_md_files(dir=\"path/to/directory\") %}".into());
+    };
+
+    let mut path = project_folder.join(dir_path);
+    if path.exists(){
+        path = path.canonicalize()?;
+    }else{
+        return Err(format!("read_md_files: path dont exists: {path:?}").into())
     }
-    if let Some(dir_path) = dir_path {
-        let list = WalkDir::new(project_folder.join(dir_path))
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| {
-                let path = entry.path();
-                let relative = path.strip_prefix(project_folder).unwrap();
 
-                let relative_str = relative.to_str().unwrap();
-                if !relative_str.ends_with(".md") || is_hidden(relative) {
-                    return None;
-                }
+    let list = WalkDir::new(path)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
 
-                Some(Path::new(path.to_str().unwrap()).to_path_buf())
-            });
-        //println!("###### list : {:?}", list);
-
-        let mut open_in_new_window = true;
-        if let Some(new_window) = args.get("external_links") {
-            if let Some(new_window) = new_window.as_bool() {
-                open_in_new_window = new_window;
+            let str = path.to_str().unwrap();
+            if !str.ends_with(".md") || is_hidden(path) {
+                return None;
             }
-        }
-        let mut md_list = Vec::new();
-        for path in list {
-            let value = match std::fs::read_to_string(&path) {
-                Ok(str) => {
-                    let toml_text = parse_toml_from_markdown(&str);
-                    //println!("toml_text: {:?}", toml_text);
-                    let html = markdown_to_html(&str, open_in_new_window);
-                    let toml = if let Some(toml_text) = toml_text {
-                        let toml: Value = match toml::from_str(&toml_text) {
-                            Ok(value) => value,
-                            Err(err) => {
-                                return Err(format!(
-                                    "Error parsing: {}, error: {err}",
-                                    path.display()
-                                )
-                                .into());
-                            }
-                        };
-                        //Value::from(toml.serialize())
-                        toml
-                    } else {
-                        Value::Null
-                    };
-                    let html = Value::String(html);
-                    serde_json::json!({
-                        "toml" : toml,
-                        "html" : html
-                    })
-                }
-                Err(e) => {
-                    return Err(
-                        format!("Unable to read file {:?}, error: {}", path.to_str(), e).into(),
-                    );
-                }
-            };
 
-            md_list.push(value);
+            Some(Path::new(path.to_str().unwrap()).to_path_buf())
+        });
+
+    let mut open_in_new_window = true;
+    if let Some(new_window) = args.get("external_links") {
+        if let Some(new_window) = new_window.as_bool() {
+            open_in_new_window = new_window;
         }
-        //println!("###### md_list : {:?}", md_list);
-        Ok(Value::Array(md_list))
-    } else {
-        Err("parse_md_files: Unable to parse directory path from arguments".into())
     }
+    let mut md_list = Vec::new();
+    for path in list {
+        let value = match std::fs::read_to_string(&path) {
+            Ok(str) => {
+                let toml_text = parse_toml_from_markdown(&str);
+                //println!("toml_text: {:?}", toml_text);
+                let file_name = path.file_name().unwrap().to_str().unwrap();
+                let html = markdown_to_html(&str, open_in_new_window);
+                let toml = if let Some(toml_text) = toml_text {
+                    let toml: Value = match toml::from_str(&toml_text) {
+                        Ok(value) => value,
+                        Err(err) => {
+                            return Err(format!(
+                                "Error parsing: {}, error: {err}",
+                                path.display()
+                            )
+                            .into());
+                        }
+                    };
+                    //Value::from(toml.serialize())
+                    toml
+                } else {
+                    Value::Null
+                };
+                let html = Value::String(html);
+                serde_json::json!({
+                    "file_name" : file_name,
+                    "key": file_name.replace(".md", ""),
+                    "toml" : toml,
+                    "html" : html
+                })
+            }
+            Err(e) => {
+                return Err(
+                    format!("Unable to read file {:?}, error: {}", path.to_str(), e).into(),
+                );
+            }
+        };
+
+        md_list.push(value);
+    }
+    //println!("###### md_list : {:?}", md_list);
+    Ok(Value::Array(md_list))
+    
 }
 
 #[derive(Clone)]
