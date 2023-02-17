@@ -230,13 +230,12 @@ impl IncludeFile {
         }
     }
 
-    fn create_tera(&self) -> tera::Tera {
+    fn create_tera(&self) -> tera::Result<tera::Tera> {
         let mut tera = match tera::Tera::new(&self.dir) {
             Ok(t) => t,
             Err(e) => {
                 println!("Parsing error(s): {}, glob:{}", e, self.dir);
-                // TODO - return Result
-                ::std::process::exit(1);
+                return Err(e);
             }
         };
 
@@ -259,7 +258,7 @@ impl IncludeFile {
             },
         );
 
-        tera
+        Ok(tera)
     }
 }
 
@@ -275,7 +274,7 @@ impl tera::Filter for IncludeFile {
         }
         let mut template = value.as_str().unwrap();
 
-        let mut tera = self.create_tera();
+        let mut tera = self.create_tera()?;
 
         let templates: Vec<&str> = tera.get_template_names().collect();
         let mut rendering_fallback = false;
