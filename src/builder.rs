@@ -5,8 +5,7 @@ use std::{
 };
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
-use tera::{Filter as TeraFilter};
-//use tera::Function;
+use tera::Filter as TeraFilter;
 use std::sync::Mutex;
 
 const SERVER_STUBS: &str = include_str!("./server-stubs.html");
@@ -179,7 +178,6 @@ impl Builder {
             Ok(t) => t,
             Err(err) => {
                 log_error!("Parsing error(s): {err}, glob:{glob}");
-                // ::std::process::exit(1);
                 return Err(err.into());
             }
         };
@@ -188,7 +186,6 @@ impl Builder {
         if let Some(sections) = &self.ctx.sections() {
             context.insert("sections", sections);
         }
-        //println!("self.ctx.manifest.sections: {:#?}", self.ctx.manifest.sections);
 
         let sort_object = SortObject {};
         let markdown_filter = Markdown {};
@@ -363,6 +360,31 @@ impl Builder {
         let this = self.clone();
         let tera_ = tera.clone();
         let mut context_ = context.clone();
+
+        let mut render_file = move|template:String, destination: String, args: &HashMap<String, tera::Value>|{
+            log_info!("RenderFile", "{} `{:?}` => {}", style("render_file:").cyan(), template, destination);
+            for (url_prefix, folder, language) in &info_ {
+                context_.extend(tera::Context::from_serialize(args).unwrap());
+                let content =
+                    this.render_template(&tera_, &template, &mut context_, language, url_prefix);
+                let this_ = this.clone();
+                if let Ok(content) = content{
+                    let template_ = template.clone();
+                    let destination_ = destination.clone();
+                    let folder_ = folder.clone();
+                    workflow_core::task::spawn(async move{
+                        this_.save_file(&content, &destination_, folder_.as_ref()).await.map_err(|err|{
+                            log_warn!("RenderFile", "Unable to render template: {template_}, error: {err:?}");
+                        }).ok();
+                    });
+                }else{
+                    log_warn!("RenderFile", "Unable to render template: {template}, error: {content:?}");
+                }
+            }
+        };
+
+        let mut render_file_ = render_file.clone();
+
         tera.register_function(
             "render_file",
             RenderFile{
@@ -370,25 +392,7 @@ impl Builder {
                     let template = get_arg("file", args)?;
                     let destination = get_arg("dest", args)?;
 
-                    log_info!("RenderFile", "{} `{:?}` => {}", style("render_file:").cyan(), template, destination);
-                    for (url_prefix, folder, language) in &info_ {
-                        context_.extend(tera::Context::from_serialize(args).unwrap());
-                        let content =
-                            this.render_template(&tera_, &template, &mut context_, language, url_prefix);
-                        let this_ = this.clone();
-                        if let Ok(content) = content{
-                            let template_ = template.clone();
-                            let destination_ = destination.clone();
-                            let folder_ = folder.clone();
-                            workflow_core::task::spawn(async move{
-                                this_.save_file(&content, &destination_, folder_.as_ref()).await.map_err(|err|{
-                                    log_warn!("RenderFile", "Unable to render template: {template_}, error: {err:?}");
-                                }).ok();
-                            });
-                        }else{
-                            log_warn!("RenderFile", "Unable to render template: {template}, error: {content:?}");
-                        }
-                    }
+                    render_file_(template, destination, args);
                     Ok(tera::Value::Bool(true))
                 }))
             },
@@ -424,6 +428,12 @@ impl Builder {
                 }
             }
         } else {
+            let md_tpl_file = ".md.html";
+            let default_dm_template_path = templates_folder.join(md_tpl_file);
+            let mut default_dm_template = None;
+            if default_dm_template_path.exists(){
+                default_dm_template = Some(md_tpl_file);
+            }
             for template in tera.get_template_names() {
                 if is_hidden(template) {
                     continue;
@@ -432,11 +442,35 @@ impl Builder {
                     log_trace!("Render", "{} `{}`", style("ignore:").yellow(), template);
                     continue;
                 }
+                if template.ends_with(".md"){
+                    let default_dir = Path::new("");
+                    let path = PathBuf::from(template);
+                    let dir = path.parent().unwrap_or(default_dir);
+                    
+                    let md_template_path = &templates_folder.join(dir).join(md_tpl_file);
+                    println!("md template: {template:?}, dir: {dir:?}, md_template:{md_template_path:?}");
+                    let template_path = dir.join(md_tpl_file);
+                    let mut md_template = template_path.as_os_str().to_str().unwrap();
+                    let destination = template_path.with_extension("html").to_str().unwrap().to_string();
+                    if !md_template_path.exists(){
+                        if default_dm_template.is_some(){
+                            md_template = default_dm_template.as_ref().unwrap();
+                        }else{
+                            continue;
+                        }
+                    }
+                    let file_name = Path::new(template).file_name().unwrap().to_str().unwrap();
+                    let mut args:HashMap<String, tera::Value> = HashMap::new();
+                    args.insert("file_name".to_string(), file_name.into());
+                    args.insert("file_path".to_string(), template.into());
 
-                for (url_prefix, folder, language) in &info {
-                    let content =
-                        self.render_template(&tera, template, &mut context, language, url_prefix)?;
-                    self.save_file(&content, template, folder.as_ref()).await?;
+                    render_file(md_template.to_string(), destination, &args);
+                }else{
+                    for (url_prefix, folder, language) in &info {
+                        let content =
+                            self.render_template(&tera, template, &mut context, language, url_prefix)?;
+                        self.save_file(&content, template, folder.as_ref()).await?;
+                    }
                 }
             }
         }
@@ -479,7 +513,7 @@ impl Builder {
         self.ctx.clean().await?;
         self.ctx.ensure_folders().await?;
 
-        let glob = "templates/**/*{.html,.js,.raw}";
+        let glob = "templates/**/*{.html,.md,.js,.raw}";
         let include = Filter::new(&[glob]);
 
         let settings = self.ctx.settings();

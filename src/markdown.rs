@@ -1,6 +1,7 @@
 use pulldown_cmark::{
     escape::{escape_href, escape_html},
     html, CowStr, Event, LinkType, Options, Parser, Tag,
+    //CodeBlockKind
 };
 //use workflow_log::log_trace;
 pub fn parse_toml_from_markdown(str: &str) -> Option<String> {
@@ -46,6 +47,8 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
     options.insert(Options::ENABLE_STRIKETHROUGH);
 
     let parser = Parser::new_ext(str, options);
+
+    //let debug = str.contains("__[DEBUG]__");
 
     //println!("markdown_to_html: {str}");
     let mut comment_started = false;
@@ -97,8 +100,18 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
                         }
                     }
                 }
+                /*
+                Tag::CodeBlock(CodeBlockKind::Indented)=>{
+                    if debug{
+                        println!("tag Indented: {:?}", tag);
+                    }
+                    Tag::Paragraph
+                }
+                */
                 _ => {
-                    // println!("tag: {:?}", tag);
+                    // if debug{
+                    //     println!("tag: {:?}", tag);
+                    // }
                     tag
                 }
             };
@@ -118,11 +131,26 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
                 Event::Html(code)
             }
         }
+        /*
+        Event::End(tag)=>{
+            match tag{
+                Tag::CodeBlock(CodeBlockKind::Indented)=>{
+                    Event::End(Tag::Paragraph)
+                }
+                _ => {
+                    Event::End(tag)
+                }
+            }
+        }
+        */
         _ => {
-            //println!("event: {:?}", event);
+            // if debug{
+            //     println!("event: {:?}", event);
+            // }
             event
         }
     });
+
 
     // Write to String buffer.
     let mut html_output = String::new();
