@@ -388,7 +388,7 @@ impl Builder {
             move |template: String, destination: String, args: &HashMap<String, tera::Value>| {
                 log_info!(
                     "RenderFile",
-                    "{} `{:?}` => {}",
+                    "{} {} => {}",
                     style("render_file:").cyan(),
                     template,
                     destination
@@ -402,6 +402,7 @@ impl Builder {
                         language,
                         url_prefix,
                     );
+
                     let this_ = this.clone();
                     if let Ok(content) = content {
                         let template_ = template.clone();
@@ -466,7 +467,7 @@ impl Builder {
 
             let section = sections.get(&root_folder);
 
-            println!("root_folder: {root_folder} template: {template}");
+            //println!("root_folder: {root_folder} template: {template}");
             if let Some(section) = section {
                 if section.template_file.ends_with(template) {
                     let sep = format!("/{}/", section.name);
@@ -500,9 +501,12 @@ impl Builder {
                     }
                     continue;
                 }
+                if is_file_hidden(template) {
+                    continue;
+                }
                 destination =
                     template.replace(&format!("{root_folder}/"), &format!("{}/", section.name));
-                println!("destination: {destination}");
+                //println!("destination: {destination}");
             } else if is_hidden(template) {
                 continue;
             }

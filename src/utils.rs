@@ -68,6 +68,17 @@ where
         .any(|f| f.as_os_str().to_string_lossy().starts_with('.'))
 }
 
+pub fn is_file_hidden<P>(path: P) -> bool
+where
+    P: AsRef<Path>,
+{
+    if let Some(file) = path.as_ref().file_name() {
+        return file.to_str().unwrap().starts_with('.');
+    }
+
+    true
+}
+
 pub fn root_folder<P>(path: P) -> Option<String>
 where
     P: AsRef<Path>,
