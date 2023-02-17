@@ -1,6 +1,12 @@
 use pulldown_cmark::{
     escape::{escape_href, escape_html},
-    html, CowStr, Event, LinkType, Options, Parser, Tag,
+    html,
+    CowStr,
+    Event,
+    LinkType,
+    Options,
+    Parser,
+    Tag,
     //CodeBlockKind
 };
 //use workflow_log::log_trace;
@@ -150,7 +156,6 @@ pub fn markdown_to_html(str: &str, open_external_in_new_window: bool) -> String 
             event
         }
     });
-
 
     // Write to String buffer.
     let mut html_output = String::new();

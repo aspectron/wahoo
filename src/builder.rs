@@ -1,12 +1,12 @@
 use crate::prelude::*;
+use std::sync::Mutex;
 use std::{
     collections::{HashMap, HashSet},
     time::Instant,
 };
+use tera::Filter as TeraFilter;
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
-use tera::Filter as TeraFilter;
-use std::sync::Mutex;
 
 const SERVER_STUBS: &str = include_str!("./server-stubs.html");
 
@@ -22,9 +22,9 @@ pub struct Builder {
     i18n_dict: Arc<Dict>,
 }
 
-pub struct SectionInfo{
+pub struct SectionInfo {
     name: String,
-    template: String,
+    template_file: String,
     files: Vec<String>,
 }
 
@@ -169,7 +169,7 @@ impl Builder {
         glob: &str,
         exclude: &Filter,
         settings: &Settings,
-        section: Option<SectionInfo>,
+        sections: HashMap<String, SectionInfo>,
     ) -> Result<()> {
         let project_folder = self.ctx.src_folder.clone();
         let dir = self.ctx.src_folder.join(glob);
@@ -200,15 +200,15 @@ impl Builder {
         tera.register_filter("include_file", include_file.clone());
         tera.register_filter("log", log);
 
-        let get_arg = |name:&str, args: &HashMap<String, tera::Value>|->tera::Result<String>{
+        let get_arg = |name: &str, args: &HashMap<String, tera::Value>| -> tera::Result<String> {
             let value = if let Some(value) = args.get(name) {
                 if let Some(value) = value.as_str() {
                     value
-                }else{
-                    return Err(format!("invalid `{name}` ({value:?}) argument").into())
+                } else {
+                    return Err(format!("invalid `{name}` ({value:?}) argument").into());
                 }
-            }else{
-                return Err(format!("`{name}` argument is missing").into())
+            } else {
+                return Err(format!("`{name}` argument is missing").into());
             };
 
             Ok(value.to_string())
@@ -255,8 +255,9 @@ impl Builder {
 
         log_trace!("Render", "processing folders");
 
+        /*
         let mut folders = HashSet::new();
-        if section.is_none() {
+        if sections.is_none() {
             for template in tera.get_template_names() {
                 // let target_file = self.ctx.target_folder.join(template);
                 let folder = Path::new(&template);
@@ -274,6 +275,7 @@ impl Builder {
                 }
             }
         }
+        */
 
         let mut language_list = Vec::new();
         let info = if let Some(languages) = &settings.languages {
@@ -328,6 +330,7 @@ impl Builder {
 
         context.insert("languages", &language_list);
 
+        /*
         for (_, language, _) in &info {
             let path = if let Some(language) = language {
                 self.ctx.site_folder.join(language)
@@ -345,16 +348,24 @@ impl Builder {
                 std::fs::create_dir_all(path.join(folder))?;
             }
         }
+        */
 
-        struct RenderFile{
-            callback: Arc<Mutex<dyn FnMut(&HashMap<String, tera::Value>) -> tera::Result<tera::Value> + Sync + Send>>
+        struct RenderFile {
+            #[allow(clippy::type_complexity)]
+            callback: Arc<
+                Mutex<
+                    dyn FnMut(&HashMap<String, tera::Value>) -> tera::Result<tera::Value>
+                        + Sync
+                        + Send,
+                >,
+            >,
         }
 
-        impl tera::Function for RenderFile{
+        impl tera::Function for RenderFile {
             fn call(&self, args: &HashMap<String, tera::Value>) -> tera::Result<tera::Value> {
-                if let Ok(f) = self.callback.lock().as_mut(){
+                if let Ok(f) = self.callback.lock().as_mut() {
                     (f)(args)
-                }else{
+                } else {
                     Ok(tera::Value::Null)
                 }
             }
@@ -365,126 +376,162 @@ impl Builder {
         let tera_ = tera.clone();
         let mut context_ = context.clone();
 
-        let mut render_file = move|template:String, destination: String, args: &HashMap<String, tera::Value>|{
-            log_info!("RenderFile", "{} `{:?}` => {}", style("render_file:").cyan(), template, destination);
-            for (url_prefix, folder, language) in &info_ {
-                context_.extend(tera::Context::from_serialize(args).unwrap());
-                let content =
-                    this.render_template(&tera_, &template, &mut context_, language, url_prefix);
-                let this_ = this.clone();
-                if let Ok(content) = content{
-                    let template_ = template.clone();
-                    let destination_ = destination.clone();
-                    let folder_ = folder.clone();
-                    workflow_core::task::spawn(async move{
-                        this_.save_file(&content, &destination_, folder_.as_ref()).await.map_err(|err|{
-                            log_warn!("RenderFile", "Unable to render template: {template_}, error: {err:?}");
-                        }).ok();
-                    });
-                }else{
-                    log_warn!("RenderFile", "Unable to render template: {template}, error: {content:?}");
+        let mut render_file =
+            move |template: String, destination: String, args: &HashMap<String, tera::Value>| {
+                log_info!(
+                    "RenderFile",
+                    "{} `{:?}` => {}",
+                    style("render_file:").cyan(),
+                    template,
+                    destination
+                );
+                for (url_prefix, folder, language) in &info_ {
+                    context_.extend(tera::Context::from_serialize(args).unwrap());
+                    let content = this.render_template(
+                        &tera_,
+                        &template,
+                        &mut context_,
+                        language,
+                        url_prefix,
+                    );
+                    let this_ = this.clone();
+                    if let Ok(content) = content {
+                        let template_ = template.clone();
+                        let destination_ = destination.clone();
+                        let folder_ = folder.clone();
+                        workflow_core::task::spawn(async move {
+                            this_
+                                .save_file(&content, &destination_, folder_.as_ref())
+                                .await
+                                .map_err(|err| {
+                                    log_warn!(
+                                        "RenderFile",
+                                        "Unable to render template: {template_}, error: {err:?}"
+                                    );
+                                })
+                                .ok();
+                        });
+                    } else {
+                        log_warn!(
+                            "RenderFile",
+                            "Unable to render template: {template}, error: {content:?}"
+                        );
+                    }
                 }
-            }
-        };
+            };
 
         let mut render_file_ = render_file.clone();
 
         tera.register_function(
             "render_file",
-            RenderFile{
-                callback: Arc::new(Mutex::new(move |args: &HashMap<String, tera::Value>|->tera::Result<tera::Value>{
-                    let template = get_arg("file", args)?;
-                    let destination = get_arg("dest", args)?;
+            RenderFile {
+                callback: Arc::new(Mutex::new(
+                    move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
+                        let template = get_arg("file", args)?;
+                        let destination = get_arg("dest", args)?;
 
-                    render_file_(template, destination, args);
-                    Ok(tera::Value::Bool(true))
-                }))
+                        render_file_(template, destination, args);
+                        Ok(tera::Value::Bool(true))
+                    },
+                )),
             },
         );
 
-        
-
         log_trace!("Render", "rendering");
-        
-        if let Some(section) = &section {
-            for template in tera.get_template_names() {
-                //println!("template: {template:?}, section.template:{:?}", section.template);
-                if section.template.ends_with(template){
+
+        let md_tpl_file = &settings.markdown.clone().unwrap_or(".md.html".to_string());
+        let default_dm_template_path = templates_folder.join(md_tpl_file);
+        let mut default_dm_template = None;
+        if default_dm_template_path.exists() {
+            default_dm_template = Some(md_tpl_file);
+        }
+
+        for template in tera.get_template_names() {
+            let root_folder = match root_folder(template) {
+                Some(folder) => folder,
+                None => {
+                    continue;
+                }
+            };
+
+            let mut destination = template.to_string();
+
+            let section = sections.get(&root_folder);
+
+            println!("root_folder: {root_folder} template: {template}");
+            if let Some(section) = section {
+                if section.template_file.ends_with(template) {
                     let sep = format!("/{}/", section.name);
                     for file in &section.files {
                         context.insert("section_file", file);
                         let mut parts = file.split(&sep);
                         parts.next();
-                        let destination  = match parts.next(){
-                            Some(value)=>PathBuf::from(&format!("{}/{}", section.name, value)).with_extension("html"),
-                            None=>continue
+                        let destination = match parts.next() {
+                            Some(value) => PathBuf::from(&format!("{}/{}", section.name, value))
+                                .with_extension("html"),
+                            None => continue,
                         };
                         //println!("destination: {destination:?}");
                         //println!("section_file: {file:?}");
-                        
-                        for (url_prefix, folder, language) in &info {
-                            let content =
-                                self.render_template(&tera, template, &mut context, language, url_prefix)?;
-                            self.save_file(&content, destination.to_str().unwrap(), folder.as_ref()).await?;
-                        }
-                    }
-                    break;
-                }
-            }
-        } else {
-            let md_tpl_file = &settings.markdown.clone().unwrap_or(".md.html".to_string());
-            let default_dm_template_path = templates_folder.join(md_tpl_file);
-            let mut default_dm_template = None;
-            if default_dm_template_path.exists(){
-                default_dm_template = Some(md_tpl_file);
-            }
-            for template in tera.get_template_names() {
-                if is_hidden(template) {
-                    continue;
-                }
-                if exclude.is_match(template) {
-                    log_trace!("Render", "{} `{}`", style("ignore:").yellow(), template);
-                    continue;
-                }
-                if template.ends_with(".md"){
-                    if default_dm_template.is_none(){
-                        continue;
-                    }
-                    let tpl_path = Path::new(template);
-                    let md_template = default_dm_template.as_ref().unwrap();
-                    let destination = tpl_path.with_extension("html").to_str().unwrap().to_string();
-                    /*
-                    let default_dir = Path::new("");
-                    let path = PathBuf::from(template);
-                    let dir = path.parent().unwrap_or(default_dir);
-                    
-                    let md_template_path = &templates_folder.join(dir).join(md_tpl_file);
-                    println!("md template: {template:?}, dir: {dir:?}, md_template:{md_template_path:?}");
-                    let template_path = dir.join(md_tpl_file);
-                    let mut md_template = template_path.as_os_str().to_str().unwrap();
-                    let destination = Path::new(template).with_extension("html").to_str().unwrap().to_string();
-                    if !md_template_path.exists(){
-                        if default_dm_template.is_some(){
-                            md_template = default_dm_template.as_ref().unwrap();
-                        }else{
-                            continue;
-                        }
-                    }
-                    */
-                    let file_name = tpl_path.file_name().unwrap().to_str().unwrap();
-                    let mut args:HashMap<String, tera::Value> = HashMap::new();
-                    args.insert("file_name".to_string(), file_name.into());
-                    args.insert("file_path".to_string(), template.into());
-                    args.insert("file_id".to_string(), template.replace("/", "-").replace(".md", "").into());
-                    args.insert("file".to_string(), file_name.replace(".md", "").into());
 
-                    render_file(md_template.to_string(), destination, &args);
-                }else{
-                    for (url_prefix, folder, language) in &info {
-                        let content =
-                            self.render_template(&tera, template, &mut context, language, url_prefix)?;
-                        self.save_file(&content, template, folder.as_ref()).await?;
+                        for (url_prefix, folder, language) in &info {
+                            let content = self.render_template(
+                                &tera,
+                                template,
+                                &mut context,
+                                language,
+                                url_prefix,
+                            )?;
+                            self.save_file(
+                                &content,
+                                destination.to_str().unwrap(),
+                                folder.as_ref(),
+                            )
+                            .await?;
+                        }
                     }
+                    continue;
+                }
+                destination =
+                    template.replace(&format!("{root_folder}/"), &format!("{}/", section.name));
+                println!("destination: {destination}");
+            } else if is_hidden(template) {
+                continue;
+            }
+
+            if exclude.is_match(template) {
+                log_trace!("Render", "{} `{}`", style("ignore:").yellow(), template);
+                continue;
+            }
+
+            if template.ends_with(".md") {
+                if default_dm_template.is_none() {
+                    continue;
+                }
+                let tpl_path = Path::new(template);
+                let md_template = default_dm_template.as_ref().unwrap();
+                let destination = Path::new(&destination)
+                    .with_extension("html")
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                let file_name = tpl_path.file_name().unwrap().to_str().unwrap();
+                let mut args: HashMap<String, tera::Value> = HashMap::new();
+                args.insert("file_name".to_string(), file_name.into());
+                args.insert("file_path".to_string(), template.into());
+                args.insert(
+                    "file_id".to_string(),
+                    template.replace('/', "-").replace(".md", "").into(),
+                );
+                args.insert("file".to_string(), file_name.replace(".md", "").into());
+
+                render_file(md_template.to_string(), destination, &args);
+            } else {
+                for (url_prefix, folder, language) in &info {
+                    let content =
+                        self.render_template(&tera, template, &mut context, language, url_prefix)?;
+                    self.save_file(&content, &destination, folder.as_ref())
+                        .await?;
                 }
             }
         }
@@ -494,6 +541,126 @@ impl Builder {
         if self.ctx.options.server {
             let update_json_file = self.ctx.site_folder.join("__wahoo.json");
             std::fs::write(update_json_file, "{}").ok();
+        }
+
+        Ok(())
+    }
+
+    pub async fn execute(&self) -> Result<()> {
+        self.ctx.clean().await?;
+        self.ctx.ensure_folders().await?;
+
+        let glob = "templates/**/*{.html,.md,.js,.raw}";
+        let include = Filter::new(&[glob]);
+
+        let settings = self.ctx.settings();
+
+        let mut exclude_list = if let Some(ignore) = &settings.ignore {
+            let mut list = ignore.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+            list.push("__INDEX__.html");
+
+            list
+        } else {
+            vec!["__INDEX__.html"]
+        };
+
+        let mut exclude = Filter::new(&exclude_list);
+        let mut section_infos = HashMap::new();
+        // render sections
+        if let Some(sections) = &self.ctx.manifest.sections {
+            log_trace!("Render", "loading sections");
+
+            let mut section_exclude_list = vec![];
+            for (name, section) in sections {
+                let section_settings = match &section.settings {
+                    Some(value) => value,
+                    None => continue,
+                };
+
+                let enumerate = match section_settings.enumerate {
+                    Some(value) => value,
+                    None => continue,
+                };
+
+                if !enumerate {
+                    continue;
+                }
+
+                let template = match &section_settings.template {
+                    Some(value) => value,
+                    None => continue,
+                };
+
+                let index_file = match &section_settings.index {
+                    Some(value) => value,
+                    None => continue,
+                };
+
+                if !template.ends_with(".html") || !index_file.ends_with(".html") {
+                    continue;
+                }
+
+                let folder = match &section_settings.folder {
+                    Some(value) => value,
+                    None => continue,
+                };
+
+                let files = WalkDir::new(self.ctx.project_folder.join(folder))
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|entry| {
+                        let path = entry.path();
+                        let relative = path.strip_prefix(&self.ctx.project_folder).unwrap();
+
+                        let r = relative.to_str().unwrap();
+                        if !(r.ends_with(".md") || r.ends_with(".html")) || is_hidden(relative) {
+                            return None;
+                        }
+
+                        //let _is_dir = entry.file_type().is_dir();
+
+                        Some(format!("../../{}", relative.to_str().unwrap()))
+                    })
+                    .collect::<Vec<String>>();
+
+                let folder = root_folder(template).unwrap();
+                let section_info = SectionInfo {
+                    name: name.clone(),
+                    template_file: template.clone(),
+                    files,
+                };
+
+                section_exclude_list.push(template);
+                section_infos.insert(folder, section_info);
+            }
+
+            for a in section_exclude_list {
+                exclude_list.push(a);
+            }
+
+            exclude = Filter::new(&exclude_list);
+
+            //println!("exclude: {exclude:#?}");
+        }
+
+        let render_start = Instant::now();
+        log_trace!("Migrate", "migrating files");
+        self.migrate(&include, &exclude).await?;
+        log_trace!("Render", "loading templates");
+        self.render(glob, &exclude, &settings, section_infos)
+            .await?;
+
+        let duration = render_start.elapsed();
+        log_info!(
+            "Build",
+            "rendering complete in {} msec",
+            duration.as_millis()
+        );
+
+        let package_json = self.ctx.site_folder.join("package.json");
+        let node_modules = self.ctx.site_folder.join("node_modules");
+        if package_json.is_file() && !node_modules.is_dir() {
+            cmd!("npm", "install").dir(&self.ctx.site_folder).run()?;
         }
 
         Ok(())
@@ -519,133 +686,6 @@ impl Builder {
         let content =
             self.render_template(tera, "__INDEX__.html", context, &language, &url_prefix)?;
         self.save_file(&content, "index.html", None).await?;
-
-        Ok(())
-    }
-
-    pub async fn execute(&self) -> Result<()> {
-        self.ctx.clean().await?;
-        self.ctx.ensure_folders().await?;
-
-        let glob = "templates/**/*{.html,.md,.js,.raw}";
-        let include = Filter::new(&[glob]);
-
-        let settings = self.ctx.settings();
-
-        let mut exclude_list = if let Some(ignore) = &settings.ignore {
-            let mut list = ignore.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-            list.push("__INDEX__.html");
-
-            list
-        } else {
-            vec!["__INDEX__.html"]
-        };
-
-        let mut exclude = Filter::new(&exclude_list);
-
-        // render sections
-        if let Some(sections) = &self.ctx.manifest.sections {
-            log_trace!("Render", "loading sections");
-            let mut list = vec![];
-            let mut section_exclude_list = vec![];
-            for (name, section) in sections {
-                let section_settings = match &section.settings {
-                    Some(value) => value,
-                    None => continue,
-                };
-
-                let enumerate = match section_settings.enumerate {
-                    Some(value) => value,
-                    None => continue,
-                };
-
-                if !enumerate {
-                    continue;
-                }
-
-                let template = match &section_settings.template {
-                    Some(value) => value,
-                    None => continue,
-                };
-
-                if !template.ends_with(".html"){
-                    continue;
-                }
-
-                let folder = match &section_settings.folder {
-                    Some(value) => value,
-                    None => continue,
-                };
-
-                let files = WalkDir::new(self.ctx.project_folder.join(folder))
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|entry| {
-                        let path = entry.path();
-                        let relative = path.strip_prefix(&self.ctx.project_folder).unwrap();
-
-                        let r = relative.to_str().unwrap();
-                        if !(r.ends_with(".md") || r.ends_with(".html")) || is_hidden(relative) {
-                            return None;
-                        }
-
-                        //let _is_dir = entry.file_type().is_dir();
-
-                        Some(format!("../../{}", relative.to_str().unwrap().to_string()))
-                    })
-                    .collect::<Vec<String>>();
-                //let template_path = PathBuf::from(&template).with_file_name("*");
-                //let tpl = template_path.to_str().unwrap().to_string();
-                let tpl = "templates/**/*.html".to_string();
-                //println!("###### tpl: {tpl:?}");
-                let section_info = SectionInfo {
-                    name: name.clone(),
-                    template: template.clone(),
-                    files
-                };
-                let mut p = template.split("templates/");
-                p.next();
-                let p = p.next().unwrap();
-                section_exclude_list.push(p);
-                list.push((section_info, tpl));
-            }
-
-            for a in section_exclude_list{
-                exclude_list.push(a);
-            }
-
-            exclude = Filter::new(&exclude_list);
-
-            //println!("exclude: {exclude:#?}");
-
-            for (section_info, tpl) in list{
-                self.render(&tpl, &exclude, &settings, Some(section_info))
-                    .await?;
-            }
-        }
-
-        //
-
-        let render_start = Instant::now();
-        log_trace!("Migrate", "migrating files");
-        self.migrate(&include, &exclude).await?;
-        log_trace!("Render", "loading templates");
-        self.render(glob, &exclude, &settings, None).await?;
-
-        
-
-        let duration = render_start.elapsed();
-        log_info!(
-            "Build",
-            "rendering complete in {} msec",
-            duration.as_millis()
-        );
-
-        let package_json = self.ctx.site_folder.join("package.json");
-        let node_modules = self.ctx.site_folder.join("node_modules");
-        if package_json.is_file() && !node_modules.is_dir() {
-            cmd!("npm", "install").dir(&self.ctx.site_folder).run()?;
-        }
 
         Ok(())
     }

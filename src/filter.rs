@@ -127,25 +127,22 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
     }
 }
 
-pub fn read_md_files(
-    project_folder: &PathBuf,
-    args: &HashMap<String, Value>,
-) -> tera::Result<Value> {
+pub fn read_md_files(project_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
     let dir_path = if let Some(file) = args.get("dir") {
         if let Some(file) = file.as_str() {
             file
-        }else{
-            return Err("read_md_files: Unable to parse directory path from arguments".into())
+        } else {
+            return Err("read_md_files: Unable to parse directory path from arguments".into());
         }
     } else {
         return Err("Use {% read_md_files(dir=\"path/to/directory\") %}".into());
     };
 
     let mut path = project_folder.join(dir_path);
-    if path.exists(){
+    if path.exists() {
         path = path.canonicalize()?;
-    }else{
-        return Err(format!("read_md_files: path dont exists: {path:?}").into())
+    } else {
+        return Err(format!("read_md_files: path dont exists: {path:?}").into());
     }
 
     let list = WalkDir::new(path)
@@ -180,11 +177,9 @@ pub fn read_md_files(
                     let toml: Value = match toml::from_str(&toml_text) {
                         Ok(value) => value,
                         Err(err) => {
-                            return Err(format!(
-                                "Error parsing: {}, error: {err}",
-                                path.display()
-                            )
-                            .into());
+                            return Err(
+                                format!("Error parsing: {}, error: {err}", path.display()).into()
+                            );
                         }
                     };
                     //Value::from(toml.serialize())
@@ -211,7 +206,6 @@ pub fn read_md_files(
     }
     //println!("###### md_list : {:?}", md_list);
     Ok(Value::Array(md_list))
-    
 }
 
 #[derive(Clone)]
@@ -289,21 +283,18 @@ impl tera::Filter for IncludeFile {
 
         if !templates.contains(&template) {
             let path = self.project_folder.join("templates").join(template);
-            if path.exists(){
+            if path.exists() {
                 let path = path.canonicalize()?;
                 //println!("path: {:?}", path);
-                tera.add_template_file(
-                    path,
-                    Some(template)
-                )?;
-            }else{
+                tera.add_template_file(path, Some(template))?;
+            } else {
                 return Err(format!("Template not found: {template}").into());
             }
         }
 
         let mut context = self.context.clone();
         context.extend(Context::from_serialize(args)?);
-        
+
         //let context = self.context.clone();
 
         //tera.add_template_file();

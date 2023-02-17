@@ -67,3 +67,19 @@ where
         .components()
         .any(|f| f.as_os_str().to_string_lossy().starts_with('.'))
 }
+
+pub fn root_folder<P>(path: P) -> Option<String>
+where
+    P: AsRef<Path>,
+{
+    let components = path.as_ref().components();
+    let mut root_folder = None;
+    for c in components {
+        if let Component::Normal(f) = c {
+            root_folder = Some(f.to_str().unwrap().to_string());
+            break;
+        }
+    }
+
+    root_folder
+}
