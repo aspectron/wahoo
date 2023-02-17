@@ -451,7 +451,7 @@ impl Builder {
                     println!("md template: {template:?}, dir: {dir:?}, md_template:{md_template_path:?}");
                     let template_path = dir.join(md_tpl_file);
                     let mut md_template = template_path.as_os_str().to_str().unwrap();
-                    let destination = template_path.with_extension("html").to_str().unwrap().to_string();
+                    let destination = Path::new(template).with_extension("html").to_str().unwrap().to_string();
                     if !md_template_path.exists(){
                         if default_dm_template.is_some(){
                             md_template = default_dm_template.as_ref().unwrap();
@@ -459,10 +459,12 @@ impl Builder {
                             continue;
                         }
                     }
+                    println!("MD destination: {destination:?}");
                     let file_name = Path::new(template).file_name().unwrap().to_str().unwrap();
                     let mut args:HashMap<String, tera::Value> = HashMap::new();
                     args.insert("file_name".to_string(), file_name.into());
                     args.insert("file_path".to_string(), template.into());
+                    args.insert("file".to_string(), file_name.replace(".md", "").into());
 
                     render_file(md_template.to_string(), destination, &args);
                 }else{
