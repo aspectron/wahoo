@@ -261,7 +261,11 @@ impl Builder {
                 // let target_file = self.ctx.target_folder.join(template);
                 let folder = Path::new(&template);
                 if let Some(parent) = folder.parent() {
-                    if exclude.is_match(parent.to_str().unwrap()) {
+                    let text = parent.to_str().unwrap();
+                    if exclude.is_match(text) {
+                        continue;
+                    }
+                    if is_hidden(text) {
                         continue;
                     }
                     if parent.to_string_lossy().len() != 0 {
@@ -428,7 +432,7 @@ impl Builder {
                 }
             }
         } else {
-            let md_tpl_file = ".md.html";
+            let md_tpl_file = &settings.markdown.clone().unwrap_or(".md.html".to_string());
             let default_dm_template_path = templates_folder.join(md_tpl_file);
             let mut default_dm_template = None;
             if default_dm_template_path.exists(){
@@ -443,6 +447,13 @@ impl Builder {
                     continue;
                 }
                 if template.ends_with(".md"){
+                    if default_dm_template.is_none(){
+                        continue;
+                    }
+                    let tpl_path = Path::new(template);
+                    let md_template = default_dm_template.as_ref().unwrap();
+                    let destination = tpl_path.with_extension("html").to_str().unwrap().to_string();
+                    /*
                     let default_dir = Path::new("");
                     let path = PathBuf::from(template);
                     let dir = path.parent().unwrap_or(default_dir);
@@ -459,11 +470,12 @@ impl Builder {
                             continue;
                         }
                     }
-                    println!("MD destination: {destination:?}");
-                    let file_name = Path::new(template).file_name().unwrap().to_str().unwrap();
+                    */
+                    let file_name = tpl_path.file_name().unwrap().to_str().unwrap();
                     let mut args:HashMap<String, tera::Value> = HashMap::new();
                     args.insert("file_name".to_string(), file_name.into());
                     args.insert("file_path".to_string(), template.into());
+                    args.insert("file_id".to_string(), template.replace("/", "-").replace(".md", "").into());
                     args.insert("file".to_string(), file_name.replace(".md", "").into());
 
                     render_file(md_template.to_string(), destination, &args);
@@ -522,12 +534,11 @@ impl Builder {
 
         let mut exclude_list = if let Some(ignore) = &settings.ignore {
             let mut list = ignore.iter().map(|s| s.as_str()).collect::<Vec<_>>();
-            list.push("partial*");
             list.push("__INDEX__.html");
 
             list
         } else {
-            vec!["partial*", "__INDEX__.html"]
+            vec!["__INDEX__.html"]
         };
 
         let mut exclude = Filter::new(&exclude_list);

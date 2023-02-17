@@ -172,6 +172,7 @@ pub struct Settings {
     pub import: Option<Vec<String>>,
     pub watch: Option<Vec<String>>,
     pub sections: Option<Vec<String>>,
+    pub markdown: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
