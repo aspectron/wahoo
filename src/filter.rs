@@ -87,7 +87,7 @@ impl tera::Filter for Markdown {
     }
 }
 
-pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
+pub fn markdown(template_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
     let mut content = None;
     if let Some(c) = args.get("content") {
         if let Some(c) = c.as_str() {
@@ -96,8 +96,8 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
         }
     } else if let Some(file) = args.get("file") {
         if let Some(file) = file.as_str() {
-            //let complete_path = project_folder.join(file);
-            content = match std::fs::read_to_string(project_folder.join(file)) {
+            //let complete_path = template_folder.join(file);
+            content = match std::fs::read_to_string(template_folder.join(file)) {
                 Ok(c) => Some(c),
                 Err(e) => {
                     log_warn!("Markdown", "Unable to read file `{}`: {}", file, e);
@@ -127,7 +127,71 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
     }
 }
 
-pub fn read_md_files(project_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
+fn read_md_file_impl(path: &Path, open_in_new_window: bool) -> tera::Result<Value> {
+    let value = match std::fs::read_to_string(path) {
+        Ok(str) => {
+            let toml_text = parse_toml_from_markdown(&str);
+            //println!("toml_text: {:?}", toml_text);
+            let file_name = path.file_name().unwrap().to_str().unwrap();
+            let html = markdown_to_html(&str, open_in_new_window);
+            let toml = if let Some(toml_text) = toml_text {
+                let toml: Value = match toml::from_str(&toml_text) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        return Err(
+                            format!("Error parsing: {}, error: {err}", path.display()).into()
+                        );
+                    }
+                };
+                //Value::from(toml.serialize())
+                toml
+            } else {
+                Value::Null
+            };
+            let html = Value::String(html);
+            serde_json::json!({
+                "file_name" : file_name,
+                "key": file_name.replace(".md", ""),
+                "toml" : toml,
+                "html" : html
+            })
+        }
+        Err(e) => {
+            return Err(format!("Unable to read file {:?}, error: {}", path.to_str(), e).into());
+        }
+    };
+
+    Ok(value)
+}
+
+pub fn read_md_file(template_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
+    let file_path = if let Some(file) = args.get("file") {
+        if let Some(file) = file.as_str() {
+            file
+        } else {
+            return Err("read_md_file: Unable to parse file path from arguments".into());
+        }
+    } else {
+        return Err("Use {% read_md_file(file=\"path/to/file\") %}".into());
+    };
+
+    let mut path = template_folder.join(file_path);
+    if path.exists() {
+        path = path.canonicalize()?;
+    } else {
+        return Err(format!("read_md_file: path dont exists: {path:?}").into());
+    }
+
+    let mut open_in_new_window = true;
+    if let Some(new_window) = args.get("external_links") {
+        if let Some(new_window) = new_window.as_bool() {
+            open_in_new_window = new_window;
+        }
+    }
+
+    read_md_file_impl(&path, open_in_new_window)
+}
+pub fn read_md_files(template_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
     let dir_path = if let Some(file) = args.get("dir") {
         if let Some(file) = file.as_str() {
             file
@@ -138,7 +202,7 @@ pub fn read_md_files(project_folder: &Path, args: &HashMap<String, Value>) -> te
         return Err("Use {% read_md_files(dir=\"path/to/directory\") %}".into());
     };
 
-    let mut path = project_folder.join(dir_path);
+    let mut path = template_folder.join(dir_path);
     if path.exists() {
         path = path.canonicalize()?;
     } else {
@@ -167,42 +231,7 @@ pub fn read_md_files(project_folder: &Path, args: &HashMap<String, Value>) -> te
     }
     let mut md_list = Vec::new();
     for path in list {
-        let value = match std::fs::read_to_string(&path) {
-            Ok(str) => {
-                let toml_text = parse_toml_from_markdown(&str);
-                //println!("toml_text: {:?}", toml_text);
-                let file_name = path.file_name().unwrap().to_str().unwrap();
-                let html = markdown_to_html(&str, open_in_new_window);
-                let toml = if let Some(toml_text) = toml_text {
-                    let toml: Value = match toml::from_str(&toml_text) {
-                        Ok(value) => value,
-                        Err(err) => {
-                            return Err(
-                                format!("Error parsing: {}, error: {err}", path.display()).into()
-                            );
-                        }
-                    };
-                    //Value::from(toml.serialize())
-                    toml
-                } else {
-                    Value::Null
-                };
-                let html = Value::String(html);
-                serde_json::json!({
-                    "file_name" : file_name,
-                    "key": file_name.replace(".md", ""),
-                    "toml" : toml,
-                    "html" : html
-                })
-            }
-            Err(e) => {
-                return Err(
-                    format!("Unable to read file {:?}, error: {}", path.to_str(), e).into(),
-                );
-            }
-        };
-
-        md_list.push(value);
+        md_list.push(read_md_file_impl(&path, open_in_new_window)?);
     }
     //println!("###### md_list : {:?}", md_list);
     Ok(Value::Array(md_list))

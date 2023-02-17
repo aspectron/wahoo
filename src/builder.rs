@@ -252,6 +252,14 @@ impl Builder {
                 Ok(value)
             },
         );
+        let templates_folder_ = templates_folder.clone();
+        tera.register_function(
+            "read_md_file",
+            move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
+                let value = read_md_file(&templates_folder_, args)?;
+                Ok(value)
+            },
+        );
 
         log_trace!("Render", "processing folders");
 

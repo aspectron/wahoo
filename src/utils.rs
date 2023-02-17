@@ -73,13 +73,11 @@ where
     P: AsRef<Path>,
 {
     let components = path.as_ref().components();
-    let mut root_folder = None;
     for c in components {
         if let Component::Normal(f) = c {
-            root_folder = Some(f.to_str().unwrap().to_string());
-            break;
+            return Some(f.to_str().unwrap().to_string());
         }
     }
 
-    root_folder
+    None
 }
