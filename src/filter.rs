@@ -235,6 +235,7 @@ impl IncludeFile {
             Ok(t) => t,
             Err(e) => {
                 println!("Parsing error(s): {}, glob:{}", e, self.dir);
+                // TODO - return Result
                 ::std::process::exit(1);
             }
         };

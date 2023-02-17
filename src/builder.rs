@@ -178,8 +178,9 @@ impl Builder {
         let mut tera = match tera::Tera::new(dir) {
             Ok(t) => t,
             Err(err) => {
-                println!("Parsing error(s): {err}, glob:{glob}");
-                ::std::process::exit(1);
+                log_error!("Parsing error(s): {err}, glob:{glob}");
+                // ::std::process::exit(1);
+                return Err(err.into());
             }
         };
 
