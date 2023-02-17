@@ -109,7 +109,7 @@ pub fn markdown(project_folder: &Path, args: &HashMap<String, Value>) -> tera::R
             };
         }
     } else {
-        return Err("Use {% markdown(content=\"# title\ntest contents\") %} or {% markdown(file=\"path/to/file\") %}".into());
+        return Err("Use {{ markdown(content=\"# title\\ntest contents\") | safe}} or {{ markdown(file=\"path/to/file\") | safe}}".into());
     }
 
     let mut open_in_new_window = true;
