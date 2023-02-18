@@ -151,6 +151,8 @@ pub async fn async_main() -> Result<()> {
                 }
             }
 
+            log_trace!("Watching", "{watch_targets:#?}");
+
             let server = Server::new(
                 port,
                 location,

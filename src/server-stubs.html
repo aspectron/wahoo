@@ -104,7 +104,9 @@ function handle_update_notification(files) {
     let path = current();
     for (let file of files) {
         let update = trunk(file);
-        if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial") || file.includes("menu")) {
+        if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial")
+         || file.includes("menu")
+         || file.includes("sections")) {
             reload();
         } else {
             console.log("ignoring update - current:",path,"update:",update);

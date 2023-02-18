@@ -151,7 +151,7 @@ fn read_md_file_impl(path: &Path, open_in_new_window: bool) -> tera::Result<Valu
             let html = Value::String(html);
             serde_json::json!({
                 "file_name" : file_name,
-                "key": file_name.replace(".md", ""),
+                "file": file_name.replace(".md", ""),
                 "toml" : toml,
                 "html" : html
             })
