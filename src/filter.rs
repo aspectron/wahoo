@@ -336,14 +336,14 @@ impl tera::Filter for IncludeFile {
         */
 
         if rendering_fallback {
-            log_info!(
+            log_trace!(
                 "Rendering",
                 "include_file={}, fallback={}",
                 style(value.as_str().unwrap()).cyan(),
                 style(template).blue()
             );
         } else {
-            log_info!(
+            log_trace!(
                 "Rendering",
                 "include_file={}",
                 style(value.as_str().unwrap()).blue()

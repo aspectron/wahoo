@@ -386,7 +386,7 @@ impl Builder {
 
         let mut render_file =
             move |template: String, destination: String, args: &HashMap<String, tera::Value>| {
-                log_info!(
+                log_trace!(
                     "RenderFile",
                     "{} {} => {}",
                     style("render_file:").cyan(),
