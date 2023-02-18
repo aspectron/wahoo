@@ -15,13 +15,21 @@ function trunk(file, lang) {
     return file.substring(0, dot);
 }
 
+function reset_hash() {
+    if ('pushState' in history) {
+        history.pushState("", document.title, window.location.pathname + window.location.search);
+    } else {
+        window.location.hash = '';
+    }
+}
+
 function store_scroll_data() {
     let scroll = document.getElementById("main").scrollTop;
     localStorage.setItem('scroll', scroll);
     localStorage.setItem('page', window.location.pathname);
 
     // also in server mode, remove the hash to prevent auto-section scrolling on reload
-    window.location.hash = '';
+    reset_hash();
 }
 
 
@@ -33,6 +41,9 @@ function restore_scroll_data() {
         localStorage.removeItem('page');
         
         if (page == window.location.pathname) {
+
+            reset_hash();
+
             document.onreadystatechange = () => {
                 if (document.readyState === "complete") {
                     setTimeout(() => {
@@ -46,13 +57,12 @@ function restore_scroll_data() {
 }
 
 function reload() {
-    window.location.hash = '';
+    reset_hash();
     window.location.reload();
 }
 
 addEventListener('beforeunload', (event) => {
-    store_scroll_data();
-    
+        store_scroll_data();
 });
 
 
