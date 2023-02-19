@@ -4,6 +4,7 @@ pub use crate:: {
     result::*,
     manifest::*,
     context::*,
+    sink::*,
     builder::*,
     log::*,
     utils::*,
@@ -19,5 +20,8 @@ pub use globset::{Glob, GlobMatcher};
 pub use serde::{Deserialize, Serialize};
 pub use std::collections::HashMap;
 pub use std::path::{Component, Path, PathBuf};
-pub use std::sync::Arc;
+pub use std::sync::{Arc, Mutex, MutexGuard};
+// pub use std::sync::atomic::{AtomicU64, Ordering};
+pub use ahash::{AHashMap, AHashSet};
+pub use std::time::SystemTime;
 pub use tera;

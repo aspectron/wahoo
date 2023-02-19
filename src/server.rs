@@ -7,7 +7,6 @@ use std::{collections::HashMap, time::Duration};
 use tide_websockets::{Message, WebSocket};
 use workflow_core::id::Id;
 // use std::hash::BuildHasher;
-use ahash::RandomState;
 use tide::http::mime;
 //use tide::utils::After;
 use tide::utils::async_trait;
@@ -61,6 +60,7 @@ pub struct Server {
     websockets: Arc<Mutex<HashMap<Id, Arc<tide_websockets::WebSocketConnection>>>>,
     session: Id,
     hashes: Mutex<HashMap<String, u64>>,
+    sink: Sink,
     // verbose: bool,
 }
 
@@ -73,6 +73,7 @@ impl Server {
         site_folder: PathBuf,
         watch_targets: &[PathBuf],
         settings: Settings,
+        sink: Sink,
         // verbose : bool,
     ) -> Arc<Server> {
         let server = Self {
@@ -86,6 +87,7 @@ impl Server {
             settings,
             session: Id::new(),
             hashes: Mutex::new(HashMap::new()),
+            sink,
             // verbose
         };
 
@@ -141,28 +143,34 @@ impl Server {
                         .expect("watched file is not in the project folder");
                     let file_str = f.as_os_str().to_str().unwrap().to_string();
 
-                    let hash_builder = RandomState::with_seed(42);
-                    let content = std::fs::read_to_string(&event.path).ok();
-                    let hash = hash_builder.hash_one(content);
-                    if let Some(prev_hash) =
-                        self.hashes.lock().unwrap().insert(file_str.clone(), hash)
-                    {
-                        if hash == prev_hash {
-                            // println!("Skipping {}", file_str);
-                            return None;
-                        }
-                    }
+                    match std::fs::read(&event.path) {
+                        Ok(content) => {
+                            let hash = make_hash(&content);
+                            if let Some(prev_hash) =
+                                self.hashes.lock().unwrap().insert(file_str.clone(), hash)
+                            {
+                                if hash == prev_hash {
+                                    // println!("Skipping {}", file_str);
+                                    return None;
+                                }
+                            }
 
-                    if file_str.contains("templates/") {
-                        let parts = file_str.split("templates/").collect::<Vec<_>>();
-                        if parts.len() == 2 {
-                            // parts.next();
-                            parts.last().map(|v| v.to_string())
-                        } else {
+                            if file_str.contains("templates/") {
+                                let parts = file_str.split("templates/").collect::<Vec<_>>();
+                                if parts.len() == 2 {
+                                    // parts.next();
+                                    parts.last().map(|v| v.to_string())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                Some(file_str)
+                            }
+                        }
+                        Err(err) => {
+                            log_error!("Unable to read `{}`: {}", event.path.display(), err);
                             None
                         }
-                    } else {
-                        Some(file_str)
                     }
                 })
                 .collect();
@@ -179,7 +187,7 @@ impl Server {
                     .await?,
                 );
                 let site_folder = ctx.site_folder.clone();
-                let build = Arc::new(Builder::new(ctx));
+                let build = Arc::new(Builder::new_with_sink(ctx, self.sink.clone()));
                 build.execute().await?;
 
                 // let noti = UpdateNotification { files };

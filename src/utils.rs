@@ -1,5 +1,11 @@
 use crate::prelude::*;
+use ahash::RandomState;
 use regex::Regex;
+
+pub fn make_hash(content: &[u8]) -> u64 {
+    let hash_builder = RandomState::with_seed(0xc0fec0de);
+    hash_builder.hash_one(content)
+}
 
 pub async fn search_upwards(folder: &Path, filename: &str) -> Option<PathBuf> {
     let mut folder = folder.to_path_buf();

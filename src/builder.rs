@@ -1,9 +1,6 @@
 use crate::prelude::*;
 use std::sync::Mutex;
-use std::{
-    collections::{HashMap, HashSet},
-    time::Instant,
-};
+use std::time::Instant;
 use tera::Filter as TeraFilter;
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
@@ -19,6 +16,7 @@ struct Language {
 #[derive(Clone)]
 pub struct Builder {
     ctx: Arc<Context>,
+    sink: Sink,
     i18n_dict: Arc<Dict>,
 }
 
@@ -32,6 +30,15 @@ impl Builder {
     pub fn new(ctx: Arc<Context>) -> Builder {
         Builder {
             ctx,
+            sink: Sink::default(),
+            i18n_dict: Arc::new(Dict::default()),
+        }
+    }
+
+    pub fn new_with_sink(ctx: Arc<Context>, sink: Sink) -> Builder {
+        Builder {
+            ctx,
+            sink,
             i18n_dict: Arc::new(Dict::default()),
         }
     }
@@ -65,33 +72,36 @@ impl Builder {
                 }
             });
 
-        let mut folders = HashSet::new();
         let list: Vec<_> = list.collect();
-        for path in list.iter() {
-            if let Some(folder) = path.parent() {
-                if folder.to_string_lossy().len() != 0 {
-                    folders.insert(folder.to_path_buf());
-                }
-            }
-        }
 
-        for folder in folders {
-            log_trace!("Migrate", "folder `{}`", folder.display());
-            std::fs::create_dir_all(self.ctx.site_folder.join(folder))?;
-        }
+        self.sink.migrate(&self.ctx, &list)?;
 
-        for file in list {
-            let to_file = self.ctx.site_folder.join(&file);
-            // println!("+{}",file.display());
-            log_trace!(
-                "Migrate",
-                "{} `{}` to `{}`",
-                style("migrate:").cyan(),
-                file.display(),
-                to_file.display()
-            );
-            std::fs::copy(self.ctx.src_folder.join(&file), to_file)?;
-        }
+        // let mut folders = HashSet::new();
+        // for path in list.iter() {
+        //     if let Some(folder) = path.parent() {
+        //         if folder.to_string_lossy().len() != 0 {
+        //             folders.insert(folder.to_path_buf());
+        //         }
+        //     }
+        // }
+
+        // for folder in folders {
+        //     log_trace!("Migrate", "folder `{}`", folder.display());
+        //     std::fs::create_dir_all(self.ctx.site_folder.join(folder))?;
+        // }
+
+        // for file in list {
+        //     let to_file = self.ctx.site_folder.join(&file);
+        //     // println!("+{}",file.display());
+        //     log_trace!(
+        //         "Migrate",
+        //         "{} `{}` to `{}`",
+        //         style("migrate:").cyan(),
+        //         file.display(),
+        //         to_file.display()
+        //     );
+        //     std::fs::copy(self.ctx.src_folder.join(&file), to_file)?;
+        // }
 
         Ok(())
     }
@@ -559,8 +569,12 @@ impl Builder {
     }
 
     pub async fn execute(&self) -> Result<()> {
-        self.ctx.clean().await?;
-        self.ctx.ensure_folders().await?;
+        // if !self.options.serve
+        self.sink.init(&self.ctx).await?;
+        // if sink.is_none() {
+        //     self.ctx.clean().await?;
+        // }
+        // self.ctx.ensure_folders().await?;
 
         let glob = "templates/**/*{.html,.md,.js,.raw}";
         let include = Filter::new(&[glob]);

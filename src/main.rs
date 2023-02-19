@@ -11,6 +11,7 @@ pub mod markdown;
 pub mod prelude;
 pub mod result;
 pub mod server;
+pub mod sink;
 pub mod utils;
 
 use prelude::*;
@@ -95,6 +96,8 @@ pub async fn async_main() -> Result<()> {
             ctx.clean().await?;
         }
         Action::Serve { port } => {
+            let sink = Sink::default();
+
             let ctx = {
                 let ctx = Arc::new(
                     Context::create(
@@ -106,7 +109,7 @@ pub async fn async_main() -> Result<()> {
                     )
                     .await?,
                 );
-                let build = Arc::new(Builder::new(ctx.clone()));
+                let build = Arc::new(Builder::new_with_sink(ctx.clone(), sink.clone()));
                 build.execute().await?;
                 ctx
             };
@@ -160,6 +163,7 @@ pub async fn async_main() -> Result<()> {
                 ctx.site_folder.clone(),
                 &watch_targets,
                 ctx.settings(),
+                sink,
             );
 
             server.run().await?;
