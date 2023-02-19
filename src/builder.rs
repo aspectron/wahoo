@@ -106,7 +106,7 @@ impl Builder {
         Ok(())
     }
 
-    async fn save_file(
+    fn save_file(
         &self,
         content: &str,
         template: &str,
@@ -122,7 +122,7 @@ impl Builder {
             std::fs::create_dir_all(folder)?;
         }
         log_trace!("Render", "{} `{}`", style("render:").cyan(), template);
-        fs::write(target_file, content).await?;
+        std::fs::write(target_file, content)?;
         Ok(())
     }
 
@@ -418,18 +418,15 @@ impl Builder {
                         let template_ = template.clone();
                         let destination_ = destination.clone();
                         let folder_ = folder.clone();
-                        workflow_core::task::spawn(async move {
-                            this_
-                                .save_file(&content, &destination_, folder_.as_ref())
-                                .await
-                                .map_err(|err| {
-                                    log_warn!(
-                                        "RenderFile",
-                                        "Unable to render template: {template_}, error: {err:?}"
-                                    );
-                                })
-                                .ok();
-                        });
+                        this_
+                        .save_file(&content, &destination_, folder_.as_ref())
+                        .map_err(|err| {
+                            log_warn!(
+                                "RenderFile",
+                                "Unable to render template: {template_}, error: {err:?}"
+                            );
+                        })
+                        .ok();
                     } else {
                         log_warn!(
                             "RenderFile",
@@ -505,8 +502,7 @@ impl Builder {
                                 &content,
                                 destination.to_str().unwrap(),
                                 folder.as_ref(),
-                            )
-                            .await?;
+                            )?;
                         }
                     }
                     continue;
@@ -552,8 +548,7 @@ impl Builder {
                 for (url_prefix, folder, language) in &info {
                     let content =
                         self.render_template(&tera, template, &mut context, language, url_prefix)?;
-                    self.save_file(&content, &destination, folder.as_ref())
-                        .await?;
+                    self.save_file(&content, &destination, folder.as_ref())?;
                 }
             }
         }
@@ -711,7 +706,7 @@ impl Builder {
 
         let content =
             self.render_template(tera, "__INDEX__.html", context, &language, &url_prefix)?;
-        self.save_file(&content, "index.html", None).await?;
+        self.save_file(&content, "index.html", None)?;
 
         Ok(())
     }
