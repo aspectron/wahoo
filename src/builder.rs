@@ -106,12 +106,7 @@ impl Builder {
         Ok(())
     }
 
-    fn save_file(
-        &self,
-        content: &str,
-        template: &str,
-        language: Option<&String>,
-    ) -> Result<()> {
+    fn save_file(&self, content: &str, template: &str, language: Option<&String>) -> Result<()> {
         let target_file = if let Some(language) = language {
             self.ctx.site_folder.join(language).join(template)
         } else {
@@ -419,14 +414,14 @@ impl Builder {
                         let destination_ = destination.clone();
                         let folder_ = folder.clone();
                         this_
-                        .save_file(&content, &destination_, folder_.as_ref())
-                        .map_err(|err| {
-                            log_warn!(
-                                "RenderFile",
-                                "Unable to render template: {template_}, error: {err:?}"
-                            );
-                        })
-                        .ok();
+                            .save_file(&content, &destination_, folder_.as_ref())
+                            .map_err(|err| {
+                                log_warn!(
+                                    "RenderFile",
+                                    "Unable to render template: {template_}, error: {err:?}"
+                                );
+                            })
+                            .ok();
                     } else {
                         log_warn!(
                             "RenderFile",
