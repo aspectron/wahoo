@@ -127,7 +127,7 @@ pub fn markdown(template_folder: &Path, args: &HashMap<String, Value>) -> tera::
     }
 }
 
-fn read_md_file_impl(path: &Path, open_in_new_window: bool) -> tera::Result<Value> {
+fn read_md_file_impl(path: &Path, root_folder:&str, open_in_new_window: bool) -> tera::Result<Value> {
     let value = match std::fs::read_to_string(path) {
         Ok(str) => {
             let toml_text = parse_toml_from_markdown(&str);
@@ -151,6 +151,7 @@ fn read_md_file_impl(path: &Path, open_in_new_window: bool) -> tera::Result<Valu
             let html = Value::String(html);
             serde_json::json!({
                 "file_name" : file_name,
+                "path" : path.to_str().unwrap().replace(root_folder, ""),
                 "file": file_name.replace(".md", ""),
                 "toml" : toml,
                 "html" : html
@@ -189,7 +190,9 @@ pub fn read_md_file(template_folder: &Path, args: &HashMap<String, Value>) -> te
         }
     }
 
-    read_md_file_impl(&path, open_in_new_window)
+    let root_folder = template_folder.parent().unwrap().parent().unwrap().to_str().unwrap();
+
+    read_md_file_impl(&path, root_folder, open_in_new_window)
 }
 pub fn read_md_files(template_folder: &Path, args: &HashMap<String, Value>) -> tera::Result<Value> {
     let dir_path = if let Some(file) = args.get("dir") {
@@ -230,8 +233,9 @@ pub fn read_md_files(template_folder: &Path, args: &HashMap<String, Value>) -> t
         }
     }
     let mut md_list = Vec::new();
+    let root_folder = template_folder.parent().unwrap().parent().unwrap().to_str().unwrap();
     for path in list {
-        md_list.push(read_md_file_impl(&path, open_in_new_window)?);
+        md_list.push(read_md_file_impl(&path, root_folder, open_in_new_window)?);
     }
     //println!("###### md_list : {:?}", md_list);
     Ok(Value::Array(md_list))
