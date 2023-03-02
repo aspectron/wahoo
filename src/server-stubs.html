@@ -23,8 +23,12 @@ function reset_hash() {
     }
 }
 
+function getScrollElement() {
+    return document.getElementById("main");
+}
+
 function store_scroll_data() {
-    let scroll = document.getElementById("main").scrollTop;
+    let scroll = getScrollElement().scrollTop;
     localStorage.setItem('scroll', scroll);
     localStorage.setItem('page', window.location.pathname);
 
@@ -48,7 +52,7 @@ function restore_scroll_data() {
                 if (document.readyState === "complete") {
                     setTimeout(() => {
                         console.log("(actual) scrolling main to",scroll);
-                        document.getElementById("main").scrollTop = scroll;
+                        getScrollElement().scrollTop = scroll;
                     }, 0);
                 }
             };

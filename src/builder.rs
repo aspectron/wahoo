@@ -5,7 +5,42 @@ use tera::Filter as TeraFilter;
 use walkdir::WalkDir;
 use workflow_i18n::Dict;
 
-const SERVER_STUBS: &str = include_str!("./server-stubs.html");
+const SERVER_STUBS_TPL: &str = include_str!("./server-stubs.html");
+
+static mut SERVER_STUBS: Option<Mutex<String>> = None;
+
+// fn server_stubs(tpl : &Option<HashMap<String,String>>) -> String {
+fn server_stubs(settings : &Option<Settings>) -> String {
+
+    let text = if let Some(text) = unsafe { &SERVER_STUBS } {
+        text.lock().unwrap().clone()
+    } else {
+        let mut text = SERVER_STUBS_TPL.to_string();
+
+        text = if let Some(Settings { scroll_element : Some(scroll_element), .. }) = settings {
+            println!("{:?}", scroll_element);
+
+            let code = if let Some(id) = &scroll_element.id {
+                format!("return document.getElementById(\"{id}\");")
+            } else if let Some(class) = &scroll_element.class {
+                format!("return document.getElementsByClassName(\"{class}\")[0];")
+            } else if let Some(tag) = &scroll_element.tag {
+                format!("return document.getElementsByTagName(\"{tag}\")[0];")
+            } else {
+                "return document.getElementById(\"main\");".to_string()
+            };
+
+            text.replace("return document.getElementById(\"main\");", &code)
+        } else {
+            text
+        };
+
+        unsafe { SERVER_STUBS = Some(Mutex::new(text.clone())) };
+        text
+    };
+
+    text
+}
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct Language {
@@ -144,7 +179,7 @@ impl Builder {
         match tera.render(template, context) {
             Ok(mut s) => {
                 if self.ctx.options.server {
-                    s += SERVER_STUBS;
+                    s += &server_stubs(&self.ctx.manifest.settings);
                 }
                 Ok(s)
             }
@@ -159,7 +194,7 @@ impl Builder {
 
                 // Err(e.into())
                 if self.ctx.options.server {
-                    error_string += SERVER_STUBS;
+                    error_string += &server_stubs(&self.ctx.manifest.settings);
                     Ok(error_string)
                 } else {
                     Ok(error_string)
