@@ -110,13 +110,22 @@ function wahoo_connect() {
     };
 }
 
+const ROOT = ["","home","index"];
+
 function handle_update_notification(files) {
     let path = current();
     for (let file of files) {
         let update = trunk(file);
-        if (path == update || file.endsWith(".toml") || file.endsWith(".css") || file.includes("partial")
-         || file.includes("menu")
-         || file.includes("sections")) {
+        if (
+            path == update 
+            || (ROOT.includes(path) && ROOT.includes(update))
+            || file.endsWith(".toml")
+            || file.endsWith(".css")
+            || file.includes("partial")
+            || file.includes("menu")
+            || file.includes("sections")
+        )
+        {
             reload();
         } else {
             console.log("ignoring update - current:",path,"update:",update);

@@ -183,7 +183,8 @@ impl Builder {
             Ok(t) => t,
             Err(err) => {
                 log_error!("Parsing error(s): {err}, glob:{glob}");
-                return Err(err.into());
+                // return Err(err.into());
+                return Ok(());
             }
         };
 

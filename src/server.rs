@@ -409,7 +409,11 @@ impl Server {
         let address = format!("127.0.0.1:{}", self.port);
         log_info!("HTTP", "server listening on {address}");
         log_info!("HTTP", "serving `{}`", self.site_folder.display());
-        app.listen(address).await?;
+        if let Err(err) = app.listen(&address).await {
+            log_error!("failed to listen on {address}: {err}");
+            println!();
+            panic!("failed to listen on {address}");
+        }
 
         Ok(())
     }
