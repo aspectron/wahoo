@@ -21,8 +21,6 @@ fn server_stubs(settings: &Option<Settings>) -> String {
             ..
         }) = settings
         {
-            println!("{:?}", scroll_element);
-
             let code = if let Some(id) = &scroll_element.id {
                 format!("return document.getElementById(\"{id}\");")
             } else if let Some(class) = &scroll_element.class {
