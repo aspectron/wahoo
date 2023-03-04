@@ -16,3 +16,7 @@ In a number of ways, Wahoo provides workflow similar to [mdBook](https://rust-la
 
 Documentation for the Tera templating engine is available at https://tera.netlify.app/docs
 
+## Install
+
+You can install Wahoo using cargo: `cargo install wahoo`
+
