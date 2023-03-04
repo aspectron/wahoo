@@ -10,14 +10,17 @@ const SERVER_STUBS_TPL: &str = include_str!("./server-stubs.html");
 static mut SERVER_STUBS: Option<Mutex<String>> = None;
 
 // fn server_stubs(tpl : &Option<HashMap<String,String>>) -> String {
-fn server_stubs(settings : &Option<Settings>) -> String {
-
+fn server_stubs(settings: &Option<Settings>) -> String {
     let text = if let Some(text) = unsafe { &SERVER_STUBS } {
         text.lock().unwrap().clone()
     } else {
         let mut text = SERVER_STUBS_TPL.to_string();
 
-        text = if let Some(Settings { scroll_element : Some(scroll_element), .. }) = settings {
+        text = if let Some(Settings {
+            scroll_element: Some(scroll_element),
+            ..
+        }) = settings
+        {
             println!("{:?}", scroll_element);
 
             let code = if let Some(id) = &scroll_element.id {

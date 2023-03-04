@@ -27,5 +27,5 @@ tide-websockets = "0.4.0"
 tokio = { version = "1.25.0", features = ["full"] }
 toml = {version = "0.7.1", features = ["preserve_order"]}
 walkdir = "2.3.2"
-workflow-core = { path = "../workflow-rs/core" }
-workflow-i18n = { path="../workflow-rs/i18n" }
+workflow-core = "0.3.10"
+workflow-i18n = "0.3.10"

@@ -177,13 +177,11 @@ pub struct Settings {
     pub scroll_element: Option<ScrollElement>,
 }
 
-
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ScrollElement {
-    pub id : Option<String>,
-    pub class : Option<String>,
-    pub tag : Option<String>,
+    pub id: Option<String>,
+    pub class: Option<String>,
+    pub tag: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
