@@ -713,7 +713,7 @@ impl Builder {
         let package_json = self.ctx.site_folder.join("package.json");
         let node_modules = self.ctx.site_folder.join("node_modules");
         if package_json.is_file() && !node_modules.is_dir() {
-            log_info!("NPM","detected `package.json`; installing ... ");
+            log_info!("NPM", "detected `package.json`; installing ... ");
             println!();
             cmd!("npm", "install").dir(&self.ctx.site_folder).run()?;
             println!();

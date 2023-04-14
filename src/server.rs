@@ -51,6 +51,7 @@ pub struct Server {
     // ctx : Arc<Context>,
     // pub tide : tide::Server<()>,
     // verbose: bool,
+    host: String,
     port: u16,
     location: Option<String>,
     project_folder: PathBuf,
@@ -65,8 +66,10 @@ pub struct Server {
 }
 
 impl Server {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         // ctx : &Arc<Context>,
+        host: String,
         port: u16,
         location: Option<String>,
         project_folder: PathBuf,
@@ -78,6 +81,7 @@ impl Server {
     ) -> Arc<Server> {
         let server = Self {
             // ctx : ctx.clone(),
+            host,
             port,
             location,
             project_folder,
@@ -406,7 +410,7 @@ impl Server {
             languages: languages.clone(),
         });
 
-        let address = format!("127.0.0.1:{}", self.port);
+        let address = format!("{}:{}", self.host, self.port);
         log_info!("HTTP", "server listening on {address}");
         log_info!("HTTP", "serving `{}`", self.site_folder.display());
         if let Err(err) = app.listen(&address).await {

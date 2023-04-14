@@ -57,6 +57,10 @@ enum Action {
     Build {},
     /// Serve the site via HTTP; Monitor and re-render if changed
     Serve {
+        /// HTTP server host
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+
         /// HTTP port to listen on
         #[clap(long, default_value = "8080")]
         port: u16,
@@ -95,7 +99,7 @@ pub async fn async_main() -> Result<()> {
 
             ctx.clean().await?;
         }
-        Action::Serve { port } => {
+        Action::Serve { host, port } => {
             let sink = Sink::default();
 
             let ctx = {
@@ -157,6 +161,7 @@ pub async fn async_main() -> Result<()> {
             log_trace!("Watching", "{watch_targets:#?}");
 
             let server = Server::new(
+                host,
                 port,
                 location,
                 ctx.project_folder.clone(),
