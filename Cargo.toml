@@ -2,6 +2,9 @@
 name = "wahoo"
 version = "0.1.0"
 edition = "2021"
+description = "Static site generator based on Tera templating engine"
+repository = "https://github.com/aspectron/wahoo"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 ahash = "0.8.7"

@@ -1,6 +1,6 @@
 # `wahoo`
 
-Wahoo is a dynamic site generator based on the [Tera](https://crates.io/crates/tera) templating engine.
+Wahoo is a static site generator based on the [Tera](https://crates.io/crates/tera) templating engine.
 
 Wahoo allows you to create custom static site generation using tera templates and TOML configuration files, the data from which is available during the template rendering.
 
